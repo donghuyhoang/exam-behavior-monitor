@@ -1,0 +1,76 @@
+﻿<Window x:Class="CameraMonitorApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Camera Monitor" Height="650" Width="950"
+        Background="#1C1E22">
+
+    <Window.Resources>
+        <!-- Style cho từng Tab -->
+        <Style x:Key="FlatTab" TargetType="TabItem">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="Border" Padding="16,10" Background="Transparent">
+                            <StackPanel>
+                                <ContentPresenter ContentSource="Header" 
+                                    HorizontalAlignment="Center"/>
+                                <Border x:Name="Underline" Height="2" Margin="0,6,0,0" 
+                                    Background="Transparent"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Underline" Property="Background" Value="#4FD1C5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Foreground" Value="#8A8F98"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Foreground" Value="#E8E8E8"/>
+                    <Setter Property="FontWeight" Value="SemiBold"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <TabControl Background="Transparent" BorderThickness="0">
+        <TabControl.ItemContainerStyle>
+            <StaticResource ResourceKey="FlatTab"/>
+        </TabControl.ItemContainerStyle>
+
+        <TabItem Header="Trực tiếp">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Status bar -->
+                <Border Grid.Row="0" Background="#24262B" Padding="14,10">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse x:Name="statusDot" Width="10" Height="10" 
+                                 Fill="#4FD1C5" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="statusText" Text="Trạng thái: Bình thường" 
+                                   Foreground="#E8E8E8" FontSize="13" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Video -->
+                <Border Grid.Row="1" Margin="12" Background="#000" CornerRadius="6" ClipToBounds="True">
+                    <wv2:WebView2 x:Name="webView"/>
+                </Border>
+            </Grid>
+        </TabItem>
+
+        <TabItem Header="Lịch sử">
+            <TextBlock Text="Chưa làm phần này" Foreground="#8A8F98"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
+        </TabItem>
+    </TabControl>
+</Window>
