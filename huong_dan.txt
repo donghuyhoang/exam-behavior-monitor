@@ -1,0 +1,3 @@
+Lấy file checkpoint mới nhất ở link này: https://drive.google.com/drive/folders/1Me6-mBc3dJmk_OSd1Ze2TBq3QQCRFddH?usp=sharing
+
+Nhớ để folder DataSet ở trong folder PBL4_Project nhé
