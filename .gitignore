@@ -10,4 +10,4 @@ __pycache__/
 *.pyc
 
 # Bỏ qua thư mục data lớn (nếu bạn không muốn push ảnh/video lên)
-# PBL4_Project/DataSet/
+PBL4_Project/DataSet/
