@@ -1,0 +1,13 @@
+# Bỏ qua các file trọng số mô hình dung lượng lớn
+*.pth
+checkpoint.pth
+PBL4_Project/checkpoint.pth
+
+# Bỏ qua môi trường ảo và bộ nhớ tạm của Python
+.venv/
+__pycache__/
+*/__pycache__/
+*.pyc
+
+# Bỏ qua thư mục data lớn (nếu bạn không muốn push ảnh/video lên)
+# PBL4_Project/DataSet/
