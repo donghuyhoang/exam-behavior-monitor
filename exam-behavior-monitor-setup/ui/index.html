@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Giám sát phòng thi</title>
+<style>
+  :root { --bg:#11161c; --panel:#1a212a; --line:#2c3642; --text:#e6eaf0; --muted:#97a3b3; --ok:#3fbf7f; --alert:#ff5a4f; --accent:#6ea8ff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 "Segoe UI", system-ui, sans-serif; }
+  header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:16px; margin:0; font-weight:600; }
+  .chip { padding:3px 10px; border-radius:999px; font-weight:600; font-size:13px; background:var(--line); }
+  .chip.ok { background:var(--ok); color:#06150d; } .chip.alert { background:var(--alert); color:#fff; } .chip.off { background:#6b7686; color:#fff; }
+  .muted { color:var(--muted); }
+  main { display:grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap:16px; padding:16px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:6px; min-width:0; }
+  .panel h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0; padding:10px 12px; border-bottom:1px solid var(--line); }
+  #video { display:block; width:100%; background:#000; aspect-ratio:16/9; object-fit:contain; }
+  #alerts { list-style:none; margin:0; padding:0; max-height:60vh; overflow:auto; }
+  #alerts li { padding:10px 12px; border-bottom:1px solid var(--line); cursor:pointer; display:grid; gap:2px; }
+  #alerts li:hover, #alerts li.sel { background:#222b36; }
+  #alerts li.new { border-left:3px solid var(--alert); }
+  .detail { padding:12px; display:grid; gap:10px; }
+  .detail img { width:100%; border-radius:4px; }
+  .btns { display:flex; gap:8px; }
+  button { font:inherit; padding:6px 14px; border-radius:4px; border:1px solid var(--line); background:#243040; color:var(--text); cursor:pointer; }
+  button.primary { background:var(--alert); border-color:var(--alert); color:#fff; }
+  button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  section.history { grid-column: 1 / -1; }
+  .table-wrap { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; }
+  th, td { padding:8px 12px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; }
+  .filters { display:flex; gap:8px; padding:10px 12px; flex-wrap:wrap; }
+  select { font:inherit; background:#243040; color:var(--text); border:1px solid var(--line); border-radius:4px; padding:4px 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Giám sát phòng thi · <span id="camera">room1-cam1</span></h1>
+  <span id="state" class="chip off">Đang kết nối…</span>
+  <span id="fps" class="muted"></span>
+</header>
+<main>
+  <section class="panel">
+    <h2>Video trực tiếp</h2>
+    <img id="video" alt="Video trực tiếp từ camera">
+  </section>
+  <section class="panel">
+    <h2>Cảnh báo mới</h2>
+    <ul id="alerts"></ul>
+    <div id="detail" class="detail" hidden>
+      <img id="detail-img" alt="Ảnh bằng chứng">
+      <div id="detail-text"></div>
+      <div class="btns">
+        <button id="btn-confirm" class="primary" type="button">Xác nhận vi phạm</button>
+        <button id="btn-dismiss" type="button">Bỏ qua</button>
+      </div>
+    </div>
+  </section>
+  <section class="panel history">
+    <h2>Lịch sử</h2>
+    <div class="filters">
+      <select id="f-type"><option value="">Mọi loại</option><option value="phone">Điện thoại</option><option value="calculator">Máy tính cầm tay</option><option value="head_turn">Quay đầu</option></select>
+      <select id="f-status"><option value="">Mọi trạng thái</option><option value="new">Mới</option><option value="confirmed">Đã xác nhận</option><option value="dismissed">Đã bỏ qua</option></select>
+      <button id="btn-reload" type="button">Tải lại</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Thời gian</th><th>Loại</th><th>Độ tin cậy</th><th>Thí sinh (track)</th><th>Trạng thái</th><th>Ảnh</th></tr></thead>
+      <tbody id="history"></tbody>
+    </table></div>
+  </section>
+</main>
+<script>
+const params = new URLSearchParams(location.search);
+const API = params.get("api") || location.origin;
+const VIDEO = params.get("video") || `http://${new URL(API).hostname}:8001/video`;
+const TYPE_VI = { phone: "Điện thoại", calculator: "Máy tính cầm tay", head_turn: "Quay đầu" };
+const STATUS_VI = { new: "Mới", confirmed: "Đã xác nhận", dismissed: "Đã bỏ qua" };
+let selected = null, alertUntil = 0, lastStatus = {};
+
+document.getElementById("video").src = VIDEO;
+const fmtTime = ts => new Date(ts).toLocaleTimeString("vi-VN");
+
+function renderState() {
+  const el = document.getElementById("state");
+  const online = lastStatus.received_at && (Date.now() / 1000 - lastStatus.received_at < 15) && lastStatus.camera_ok !== false;
+  if (!online) { el.className = "chip off"; el.textContent = "Mất kết nối camera"; }
+  else if (Date.now() < alertUntil) { el.className = "chip alert"; el.textContent = "CẢNH BÁO"; }
+  else { el.className = "chip ok"; el.textContent = "Bình thường"; }
+  document.getElementById("fps").textContent = lastStatus.fps ? `${lastStatus.fps} khung/giây · trễ ${lastStatus.latency_ms ?? "?"} ms` : "";
+}
+setInterval(renderState, 1000);
+
+function addAlert(e, isNew) {
+  const li = document.createElement("li");
+  li.dataset.id = e.event_id;
+  if (isNew && e.status === "new") li.classList.add("new");
+  li.innerHTML = `<strong>${TYPE_VI[e.type] || e.type}</strong><span class="muted">${fmtTime(e.ts)} · tin cậy ${(e.confidence * 100).toFixed(0)}% · thí sinh #${e.student_track_id ?? "?"}</span>`;
+  li.addEventListener("click", () => select(e));
+  document.getElementById("alerts").prepend(li);
+}
+
+function select(e) {
+  selected = e;
+  document.querySelectorAll("#alerts li").forEach(li => li.classList.toggle("sel", li.dataset.id === e.event_id));
+  document.getElementById("detail").hidden = false;
+  document.getElementById("detail-img").src = API + e.snapshot_url;
+  document.getElementById("detail-text").textContent =
+    `${TYPE_VI[e.type] || e.type} lúc ${fmtTime(e.ts)}, kéo dài ${e.duration_s}s, trạng thái: ${STATUS_VI[e.status]}`;
+}
+
+async function setStatus(status) {
+  if (!selected) return;
+  const r = await fetch(`${API}/api/events/${selected.event_id}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
+  if (r.ok) { selected = await r.json(); select(selected); loadHistory(); }
+}
+document.getElementById("btn-confirm").onclick = () => setStatus("confirmed");
+document.getElementById("btn-dismiss").onclick = () => setStatus("dismissed");
+
+async function loadHistory() {
+  const q = new URLSearchParams({ limit: 200 });
+  const t = document.getElementById("f-type").value, s = document.getElementById("f-status").value;
+  if (t) q.set("type", t); if (s) q.set("status", s);
+  const rows = await (await fetch(`${API}/api/events?${q}`)).json();
+  document.getElementById("history").innerHTML = rows.map(e => `<tr>
+    <td>${new Date(e.ts).toLocaleString("vi-VN")}</td><td>${TYPE_VI[e.type] || e.type}</td>
+    <td>${(e.confidence * 100).toFixed(0)}%</td><td>#${e.student_track_id ?? "?"}</td><td>${STATUS_VI[e.status]}</td>
+    <td>${e.snapshot_url ? `<a href="${API + e.snapshot_url}" target="_blank" rel="noopener">Xem</a>` : ""}</td></tr>`).join("");
+  return rows;
+}
+["f-type", "f-status"].forEach(id => document.getElementById(id).onchange = loadHistory);
+document.getElementById("btn-reload").onclick = loadHistory;
+
+function connect() {
+  const ws = new WebSocket(API.replace(/^http/, "ws") + "/ws/events");
+  ws.onmessage = msg => {
+    const m = JSON.parse(msg.data);
+    if (m.kind === "event") { addAlert(m.data, true); alertUntil = Date.now() + 5000; loadHistory(); }
+    if (m.kind === "status") { lastStatus = m.data; document.getElementById("camera").textContent = m.data.camera_id || ""; }
+    renderState();
+  };
+  ws.onclose = () => setTimeout(connect, 2000);
+}
+
+(async () => {
+  try { lastStatus = await (await fetch(`${API}/api/status`)).json(); } catch (e) {}
+  const rows = await loadHistory().catch(() => []);
+  rows.slice(0, 20).reverse().forEach(e => addAlert(e, false));
+  connect();
+  renderState();
+})();
+</script>
+</body>
+</html>

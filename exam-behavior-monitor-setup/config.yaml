@@ -1,0 +1,40 @@
+# Cấu hình chung của hệ thống. Mật khẩu camera để trong .env, không ghi vào đây.
+camera:
+  id: room1-cam1
+  room: room1
+  source: "${RTSP_URL}"        # địa chỉ RTSP, đường dẫn file video mẫu, hoặc 0 cho webcam
+
+model:
+  weights: weights/checkpoint_best_total.pth
+  size: medium                 # nano | small | medium, phải đúng với lúc train
+  threshold: 0.3               # khung có độ tin cậy từ mức này mới được vẽ và theo dõi
+  optimize: true               # gọi optimize_for_inference() của rfdetr để chạy nhanh hơn
+
+rules:
+  alert_classes: [phone]       # thêm calculator khi môn thi cấm máy tính cầm tay
+  min_confidence: 0.5          # khung điện thoại dưới mức này không tính
+  window_s: 2.0                # xét trong cửa sổ 2 giây gần nhất
+  min_ratio: 0.6               # phải thấy ở ít nhất 60% số khung trong cửa sổ
+  cooldown_s: 30               # mỗi thí sinh nghỉ 30 giây rồi mới báo lại
+
+behavior:
+  enabled: false               # bật khi đã có module MediaPipe (P1)
+  every_n_frames: 5            # MediaPipe chậm, chỉ chạy 1 khung trong 5 khung
+  yaw_ratio: 0.35              # mũi lệch khỏi giữa hai mắt quá 35% khoảng cách hai mắt thì coi là quay đầu
+  min_duration_s: 3.0
+  cooldown_s: 30
+
+mqtt:
+  host: 127.0.0.1              # máy chạy Mosquitto (laptop nhóm trưởng)
+  port: 1883
+  topic_events: pbl4/room1/events
+  topic_status: pbl4/room1/status
+
+output:
+  snapshot_dir: data/snapshots
+  mjpeg_port: 8001
+  stream_width: 1280           # thu nhỏ video phát lên giao diện cho nhẹ
+  status_every_s: 5
+
+backend:
+  db_path: data/pbl4.db

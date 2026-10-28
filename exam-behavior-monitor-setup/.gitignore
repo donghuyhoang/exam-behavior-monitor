@@ -1,0 +1,10 @@
+.env
+.venv/
+__pycache__/
+weights/*
+!weights/.gitkeep
+data/*
+!data/.gitkeep
+runs/
+videos/
+*.mp4

@@ -1,0 +1,7 @@
+rfdetr
+opencv-python
+mediapipe
+paho-mqtt
+pyyaml
+numpy
+pillow
