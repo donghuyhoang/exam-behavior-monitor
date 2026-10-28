@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Giám sát phòng thi</title>
+<!-- Giao diện tham khảo: backend phục vụ ở http://<ip-laptop>:8000/ui/
+     Tham số: ?api=http://<ip>:8000 nếu mở file ở nơi khác, ?video=http://<ip>:8001/video để đổi nguồn video. -->
 <style>
   :root { --bg:#11161c; --panel:#1a212a; --line:#2c3642; --text:#e6eaf0; --muted:#97a3b3; --ok:#3fbf7f; --alert:#ff5a4f; --accent:#6ea8ff; }
   * { box-sizing: border-box; }
@@ -11,8 +13,9 @@
   header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line); }
   header h1 { font-size:16px; margin:0; font-weight:600; }
   .chip { padding:3px 10px; border-radius:999px; font-weight:600; font-size:13px; background:var(--line); }
-  .chip.ok { background:var(--ok); color:#06150d; } .chip.alert { background:var(--alert); color:#fff; } .chip.off { background:#6b7686; color:#fff; }
+  .chip.ok { background:var(--ok); color:#06150d; } .chip.alert { background:var(--alert); color:#fff; } .chip.off { background:#6b7686; color:#fff; } .chip.warn { background:#f5a524; color:#1c1200; }
   .muted { color:var(--muted); }
+  .low { color:#f5a524; font-weight:600; }
   main { display:grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap:16px; padding:16px; }
   @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
   .panel { background:var(--panel); border:1px solid var(--line); border-radius:6px; min-width:0; }
@@ -23,6 +26,7 @@
   #alerts li:hover, #alerts li.sel { background:#222b36; }
   #alerts li.new { border-left:3px solid var(--alert); }
   .detail { padding:12px; display:grid; gap:10px; }
+  .detail[hidden] { display:none; }
   .detail img { width:100%; border-radius:4px; }
   .btns { display:flex; gap:8px; }
   button { font:inherit; padding:6px 14px; border-radius:4px; border:1px solid var(--line); background:#243040; color:var(--text); cursor:pointer; }
@@ -34,7 +38,9 @@
   th, td { padding:8px 12px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
   th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; }
   .filters { display:flex; gap:8px; padding:10px 12px; flex-wrap:wrap; }
-  select { font:inherit; background:#243040; color:var(--text); border:1px solid var(--line); border-radius:4px; padding:4px 8px; }
+  .filters label { display:flex; align-items:center; gap:6px; color:var(--muted); }
+  select, input[type=datetime-local] { font:inherit; color-scheme:dark; background:#243040; color:var(--text); border:1px solid var(--line); border-radius:4px; padding:4px 8px; }
+  .filters .count { align-self:center; margin-left:auto; }
 </style>
 </head>
 <body>
@@ -65,7 +71,12 @@
     <div class="filters">
       <select id="f-type"><option value="">Mọi loại</option><option value="phone">Điện thoại</option><option value="calculator">Máy tính cầm tay</option><option value="head_turn">Quay đầu</option></select>
       <select id="f-status"><option value="">Mọi trạng thái</option><option value="new">Mới</option><option value="confirmed">Đã xác nhận</option><option value="dismissed">Đã bỏ qua</option></select>
+      <label>Từ <input type="datetime-local" id="f-from"></label>
+      <label>Đến <input type="datetime-local" id="f-to"></label>
+      <button id="btn-today" type="button">Hôm nay</button>
+      <button id="btn-clear" type="button">Xóa lọc</button>
       <button id="btn-reload" type="button">Tải lại</button>
+      <span id="h-count" class="muted count"></span>
     </div>
     <div class="table-wrap"><table>
       <thead><tr><th>Thời gian</th><th>Loại</th><th>Độ tin cậy</th><th>Thí sinh (track)</th><th>Trạng thái</th><th>Ảnh</th></tr></thead>
@@ -79,6 +90,7 @@ const API = params.get("api") || location.origin;
 const VIDEO = params.get("video") || `http://${new URL(API).hostname}:8001/video`;
 const TYPE_VI = { phone: "Điện thoại", calculator: "Máy tính cầm tay", head_turn: "Quay đầu" };
 const STATUS_VI = { new: "Mới", confirmed: "Đã xác nhận", dismissed: "Đã bỏ qua" };
+const FPS_MIN = 10;   // dưới mức này thì báo FPS thấp (tiêu chí nghiệm thu: từ 10 khung/giây)
 let selected = null, alertUntil = 0, lastStatus = {};
 
 document.getElementById("video").src = VIDEO;
@@ -87,10 +99,15 @@ const fmtTime = ts => new Date(ts).toLocaleTimeString("vi-VN");
 function renderState() {
   const el = document.getElementById("state");
   const online = lastStatus.received_at && (Date.now() / 1000 - lastStatus.received_at < 15) && lastStatus.camera_ok !== false;
+  const lowFps = online && lastStatus.fps != null && Number(lastStatus.fps) < FPS_MIN;
   if (!online) { el.className = "chip off"; el.textContent = "Mất kết nối camera"; }
   else if (Date.now() < alertUntil) { el.className = "chip alert"; el.textContent = "CẢNH BÁO"; }
+  else if (lowFps) { el.className = "chip warn"; el.textContent = "FPS thấp"; }
   else { el.className = "chip ok"; el.textContent = "Bình thường"; }
-  document.getElementById("fps").textContent = lastStatus.fps ? `${lastStatus.fps} khung/giây · trễ ${lastStatus.latency_ms ?? "?"} ms` : "";
+  const fpsEl = document.getElementById("fps");
+  fpsEl.className = lowFps ? "low" : "muted";
+  fpsEl.textContent = lastStatus.fps != null
+    ? `${lowFps ? "⚠ FPS thấp: " : ""}${lastStatus.fps} khung/giây · trễ ${lastStatus.latency_ms ?? "?"} ms` : "";
 }
 setInterval(renderState, 1000);
 
@@ -125,14 +142,29 @@ async function loadHistory() {
   const q = new URLSearchParams({ limit: 200 });
   const t = document.getElementById("f-type").value, s = document.getElementById("f-status").value;
   if (t) q.set("type", t); if (s) q.set("status", s);
+  const from = document.getElementById("f-from").value, to = document.getElementById("f-to").value;
+  if (from) q.set("from", from + ":00");   // so sánh chuỗi với ts ISO của backend (cùng múi giờ máy)
+  if (to) q.set("to", to + ":59");
   const rows = await (await fetch(`${API}/api/events?${q}`)).json();
   document.getElementById("history").innerHTML = rows.map(e => `<tr>
     <td>${new Date(e.ts).toLocaleString("vi-VN")}</td><td>${TYPE_VI[e.type] || e.type}</td>
     <td>${(e.confidence * 100).toFixed(0)}%</td><td>#${e.student_track_id ?? "?"}</td><td>${STATUS_VI[e.status]}</td>
     <td>${e.snapshot_url ? `<a href="${API + e.snapshot_url}" target="_blank" rel="noopener">Xem</a>` : ""}</td></tr>`).join("");
+  document.getElementById("h-count").textContent = `${rows.length} cảnh báo`;
   return rows;
 }
-["f-type", "f-status"].forEach(id => document.getElementById(id).onchange = loadHistory);
+["f-type", "f-status", "f-from", "f-to"].forEach(id => document.getElementById(id).onchange = loadHistory);
+const pad = n => String(n).padStart(2, "0");
+document.getElementById("btn-today").onclick = () => {   // lọc nhanh: từ 00:00 đến 23:59 hôm nay
+  const d = new Date(), day = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  document.getElementById("f-from").value = `${day}T00:00`;
+  document.getElementById("f-to").value = `${day}T23:59`;
+  loadHistory();
+};
+document.getElementById("btn-clear").onclick = () => {
+  ["f-type", "f-status", "f-from", "f-to"].forEach(id => document.getElementById(id).value = "");
+  loadHistory();
+};
 document.getElementById("btn-reload").onclick = loadHistory;
 
 function connect() {
@@ -143,7 +175,7 @@ function connect() {
     if (m.kind === "status") { lastStatus = m.data; document.getElementById("camera").textContent = m.data.camera_id || ""; }
     renderState();
   };
-  ws.onclose = () => setTimeout(connect, 2000);
+  ws.onclose = () => setTimeout(connect, 2000);   // backend khởi động lại thì tự nối lại
 }
 
 (async () => {
