@@ -8,10 +8,10 @@ model:
   weights: weights/checkpoint_best_total.pth
   size: medium                 # nano | small | medium, phải đúng với lúc train
   threshold: 0.3               # khung có độ tin cậy từ mức này mới được vẽ và theo dõi
-  optimize: true               # gọi optimize_for_inference() của rfdetr để chạy nhanh hơn
+  optimize: true               # biên dịch mô hình trước khi chạy (rfdetr 1.11: inference()); laptop RTX 5050: 27 FPS thay vì 14
 
 rules:
-  alert_classes: [phone]       # thêm calculator khi môn thi cấm máy tính cầm tay
+  alert_classes: [phone, calculator]   # demo 31/10: báo mọi thiết bị điện tử, vì mô hình còn nhầm điện thoại cầm tay thành calculator
   min_confidence: 0.5          # khung điện thoại dưới mức này không tính
   window_s: 2.0                # xét trong cửa sổ 2 giây gần nhất
   min_ratio: 0.6               # phải thấy ở ít nhất 60% số khung trong cửa sổ

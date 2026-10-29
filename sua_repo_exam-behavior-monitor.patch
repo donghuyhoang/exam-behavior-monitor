@@ -1,0 +1,653 @@
+diff --git a/exam-behavior-monitor-setup/README.md b/exam-behavior-monitor-setup/README.md
+new file mode 100644
+index 0000000..a1c13e8
+--- /dev/null
++++ b/exam-behavior-monitor-setup/README.md
+@@ -0,0 +1,50 @@
++# PBL4: hệ thống camera giám sát phòng thi
++
++Camera (RTSP) → `ai_service` (RF-DETR + theo dõi + luật vi phạm) → MQTT → `backend` (FastAPI, SQLite, ảnh bằng chứng) → giao diện giám thị.
++
++## Cấu trúc
++
++| Thư mục | Ai | Nội dung |
++|---|---|---|
++| `ai_service/` | B | `main.py` vòng chạy chính, `stream.py` đọc camera/video, `detector.py` RF-DETR, `tracker.py` gán track_id, `rules.py` luật vi phạm, `publisher.py` MQTT, `mjpeg.py` phát video, `bench_fps.py` đo tốc độ |
++| `backend/` | C | `app.py` API + MQTT + SQLite + WebSocket, `fake_events.py` sự kiện giả |
++| `ui/` | C | `index.html` giao diện tham khảo, backend phục vụ ở `/ui/` |
++| `behavior/` | NT (P1) | `head_pose.py` MediaPipe phát hiện quay đầu |
++| `tools/` | NT, A | `probe_camera.py` dò camera, `export_preds_rfdetr.py` xuất dự đoán để chấm điểm, `mosquitto.conf` |
++| `tests/` | mọi người | kiểm thử luật và bộ theo dõi, không cần GPU |
++
++`weights/` (checkpoint), `data/` (cơ sở dữ liệu, ảnh bằng chứng), `.env` (mật khẩu camera) không commit.
++
++## Cài trên laptop máy chủ (Windows)
++
++```
++py install 3.12                      # nếu chưa có Python 3.12
++py -3.12 -m venv .venv
++.venv\Scripts\activate
++pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
++pip install -r requirements-ai.txt -r requirements-backend.txt
++copy .env.example .env               # rồi sửa RTSP_URL
++```
++
++Chép checkpoint RF-DETR vào `weights/checkpoint_best_total.pth`.
++
++## Chạy (mỗi lệnh một cửa sổ, từ thư mục gốc)
++
++```
++python tools\mqtt_broker.py          # hoặc Mosquitto: "C:\Program Files\mosquitto\mosquitto.exe" -c tools\mosquitto.conf -v
++uvicorn backend.app:app --host 0.0.0.0 --port 8000
++python -m ai_service.main --show
++```
++
++Hoặc bật cả ba bằng một lệnh: `powershell -ExecutionPolicy Bypass -File run_demo.ps1` (thêm `-Source videos\test1.mp4` để chạy video dự phòng).
++Dịch vụ AI mất khoảng 30–50 giây để nạp và biên dịch mô hình trước khi có hình. Đo trên laptop RTX 5050: mô hình 27 FPS, cả vòng xử lý khoảng 24 FPS.
++
++Mở http://localhost:8000/ui/. Máy khác trong cùng mạng mở `http://<ip-laptop>:8000/ui/` (cho phép cổng 1883, 8000, 8001 trong Windows Firewall, mạng Private).
++
++## Không có camera hoặc GPU
++
++```
++python -m ai_service.main --source videos/mau_000.mp4 --dry-run --save-video runs/out.mp4   # Colab
++python -m backend.fake_events --every 3                                                     # làm backend/giao diện
++python tests/test_rules.py && python tests/test_tracker.py
++```
+diff --git a/exam-behavior-monitor-setup/ai_service/detector.py b/exam-behavior-monitor-setup/ai_service/detector.py
+index e9b74d4..4f026de 100644
+--- a/exam-behavior-monitor-setup/ai_service/detector.py
++++ b/exam-behavior-monitor-setup/ai_service/detector.py
+@@ -4,16 +4,22 @@ from PIL import Image
+ 
+ 
+ class RFDETRDetector:
+-    def __init__(self, weights, size="medium", threshold=0.3, optimize=True):
++    def __init__(self, weights, size="medium", threshold=0.3, optimize=True, fp16=False):
++        # Đo trên RTX 5050 laptop (28/10): tối ưu FP32 27 FPS, FP16 21 FPS, không tối ưu 14 FPS -> mặc định FP32
+         import rfdetr
++        import torch
+ 
+         model_cls = {"nano": rfdetr.RFDETRNano, "small": rfdetr.RFDETRSmall, "medium": rfdetr.RFDETRMedium}[size]
+         self.model = model_cls(pretrain_weights=weights)
+         if optimize:
+             try:
+-                self.model.optimize_for_inference()
+-            except Exception as e:
+-                print(f"[detector] bỏ qua optimize_for_inference: {e}")
++                if hasattr(self.model, "optimize_for_inference"):
++                    self.model.optimize_for_inference()
++                else:  # rfdetr 1.11 đổi tên thành inference()
++                    dtype = torch.float16 if fp16 and torch.cuda.is_available() else torch.float32
++                    self.model.inference(compile=True, dtype=dtype)
++            except Exception as e:  # tối ưu lỗi thì vẫn chạy được, chỉ chậm hơn
++                print(f"[detector] bỏ qua bước tối ưu: {e}")
+         self.names = self.model.class_names
+         self.threshold = threshold
+ 
+diff --git a/exam-behavior-monitor-setup/ai_service/main.py b/exam-behavior-monitor-setup/ai_service/main.py
+index c1e410f..deaa2fd 100644
+--- a/exam-behavior-monitor-setup/ai_service/main.py
++++ b/exam-behavior-monitor-setup/ai_service/main.py
+@@ -1,5 +1,14 @@
+-"""Dịch vụ AI: đọc camera, phát hiện bằng RF-DETR, theo dõi từng đối tượng, áp luật vi phạm, gửi sự kiện."""
++"""Dịch vụ AI: đọc camera, phát hiện bằng RF-DETR, theo dõi từng đối tượng, áp luật vi phạm, gửi sự kiện.
++
++Trên laptop nhóm trưởng (camera thật, gửi MQTT, phát video ở cổng 8001):
++    python -m ai_service.main
++    python -m ai_service.main --show            # mở thêm cửa sổ xem trực tiếp, bấm q để thoát
++
++Trên Colab hoặc máy không có camera (đọc file, ghi runs/events.jsonl, ảnh bằng chứng và video kết quả):
++    python -m ai_service.main --source videos/mau_000.mp4 --dry-run --save-video runs/mau_000_out.mp4
++"""
+ import argparse
++import json
+ import time
+ from datetime import datetime
+ from pathlib import Path
+@@ -18,12 +27,41 @@ RED = (0, 0, 255)
+ 
+ 
+ def to_dets(det, tracker, name_of):
++    """supervision.Detections của RF-DETR -> danh sách Det có track_id."""
+     if len(det) == 0 or det.class_id is None:
+         tracker.update([], [])
+         return []
+     ids = tracker.update(det.xyxy, det.class_id)
+-    return [Det(int(tid), name_of(cid), float(conf), tuple(float(v) for v in box))
+-            for box, cid, conf, tid in zip(det.xyxy, det.class_id, det.confidence, ids)]
++    # Ưu tiên tên lớp rfdetr gắn sẵn vào kết quả (cách đã dùng khi chấm benchmark), không có mới tra theo class_id
++    names = (det.data or {}).get("class_name")
++    if names is None or len(names) != len(det):
++        names = [name_of(cid) for cid in det.class_id]
++    return [Det(int(tid), str(name), float(conf), tuple(float(v) for v in box))
++            for box, name, conf, tid in zip(det.xyxy, names, det.confidence, ids)]
++
++
++class DetectionSummary:
++    """Gom số khung và độ tin cậy cao nhất của từng lớp, in mỗi vài giây để biết mô hình đang thấy gì."""
++
++    def __init__(self, classes=("student", "phone", "calculator")):
++        self.classes = classes
++        self.stats = {}
++
++    def add(self, dets):
++        per_frame = {}
++        for d in dets:
++            n, best = per_frame.get(d.cls, (0, 0.0))
++            per_frame[d.cls] = (n + 1, max(best, d.conf))
++        for cls, (n, best) in per_frame.items():
++            most, top = self.stats.get(cls, (0, 0.0))
++            self.stats[cls] = (max(most, n), max(top, best))
++
++    def line(self, t):
++        names = list(self.classes) + [c for c in self.stats if c not in self.classes]
++        parts = [f"{c}: tối đa {self.stats[c][0]}/khung, tin cậy cao nhất {self.stats[c][1]:.2f}" if c in self.stats
++                 else f"{c}: không thấy" for c in names]
++        self.stats = {}
++        return f"[{t:7.1f}s] " + " | ".join(parts)
+ 
+ 
+ def draw(frame, dets, red_boxes=(), banner=""):
+@@ -50,12 +88,14 @@ def xywh(box):
+ 
+ 
+ class EventMaker:
++    """Tạo sự kiện đúng mẫu JSON chung và lưu ảnh bằng chứng."""
++
+     def __init__(self, cfg, snapshot_root):
+         self.cfg = cfg
+         self.snapshot_root = Path(snapshot_root)
+         self.seq = 0
+ 
+-    def make(self, type_, conf, box, track_id, duration_s, evidence_img, student_track_id=None):
++    def make(self, type_, conf, box, track_id, duration_s, evidence_img, student_track_id=None, video_t=None):
+         now = datetime.now().astimezone()
+         self.seq += 1
+         event_id = f"{self.cfg['camera']['room']}-{now:%Y%m%d-%H%M%S}-{self.seq:03d}"
+@@ -63,7 +103,7 @@ class EventMaker:
+         path = self.snapshot_root / day / f"{event_id}.jpg"
+         path.parent.mkdir(parents=True, exist_ok=True)
+         cv2.imwrite(str(path), evidence_img)
+-        return {
++        event = {
+             "event_id": event_id,
+             "camera_id": self.cfg["camera"]["id"],
+             "ts": now.isoformat(timespec="seconds"),
+@@ -75,6 +115,9 @@ class EventMaker:
+             "duration_s": duration_s,
+             "snapshot": f"snapshots/{day}/{event_id}.jpg",
+         }
++        if video_t is not None:
++            event["video_t"] = video_t   # giây thứ mấy trong file video, để so với kịch bản quay
++        return event
+ 
+ 
+ def main():
+@@ -85,15 +128,22 @@ def main():
+     ap.add_argument("--out", default="runs", help="thư mục kết quả khi --dry-run")
+     ap.add_argument("--save-video", help="ghi video đã vẽ khung ra file .mp4")
+     ap.add_argument("--show", action="store_true", help="mở cửa sổ xem trực tiếp (bấm q để thoát)")
++    ap.add_argument("--dump-dets", help="lưu kết quả phát hiện từng khung ra file .jsonl để chỉnh ngưỡng bằng tools/tune_rules.py")
++    ap.add_argument("--threshold", type=float, help="ghi đè model.threshold (khi chỉnh ngưỡng nên dùng 0.2)")
+     args = ap.parse_args()
+ 
+     cfg = load_config(args.config)
+     source = FrameSource(args.source if args.source is not None else cfg["camera"]["source"])
+     m = cfg["model"]
+-    detector = RFDETRDetector(str(ROOT / m["weights"]), m.get("size", "medium"), m.get("threshold", 0.3),
+-                              m.get("optimize", True))
++    threshold = args.threshold if args.threshold is not None else m.get("threshold", 0.3)
++    detector = RFDETRDetector(str(ROOT / m["weights"]), m.get("size", "medium"), threshold, m.get("optimize", True))
++    dump = None
++    if args.dump_dets:
++        Path(args.dump_dets).parent.mkdir(parents=True, exist_ok=True)
++        dump = open(args.dump_dets, "w", encoding="utf-8")
++        dump.write(json.dumps({"video": Path(str(source.source)).name, "fps": source.fps, "threshold": threshold}) + "\n")
+     fps_guess = source.fps if source.fps and source.fps < 120 else 15
+-    tracker = IouTracker(max_lost=int(2 * fps_guess))
++    tracker = IouTracker(max_lost=int(2 * fps_guess))   # mất dấu quá khoảng 2 giây thì coi là đối tượng mới
+     r = cfg["rules"]
+     rules = ViolationRules(r["alert_classes"], r["min_confidence"], r["window_s"], r["min_ratio"], r["cooldown_s"])
+     publisher = EventPublisher(cfg, dry_run=args.dry_run, out_dir=args.out)
+@@ -112,6 +162,7 @@ def main():
+         behavior = HeadTurnDetector(yaw_ratio=b["yaw_ratio"], min_duration_s=b["min_duration_s"], cooldown_s=b["cooldown_s"])
+ 
+     writer = None
++    summary, last_summary = DetectionSummary(), None
+     fps_ema, last_status, last_tick = 0.0, 0.0, time.perf_counter()
+     alert_until, alert_boxes = 0.0, []
+     try:
+@@ -119,16 +170,22 @@ def main():
+             ok, frame, t, captured_at = source.read()
+             if not ok:
+                 if not source.live:
+-                    break
++                    break  # hết file video
+                 publisher.status({"camera_id": cfg["camera"]["id"], "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
+                                   "fps": 0.0, "latency_ms": None, "camera_ok": False})
+                 continue
+ 
+             dets = to_dets(detector(frame), tracker, detector.name_of)
++            summary.add(dets)
++            if dump:
++                dump.write(json.dumps({"t": round(t, 3), "d": [[d.track_id, d.cls, round(d.conf, 3)] + [int(v) for v in d.box]
++                                                                for d in dets]}) + "\n")
++            video_t = None if source.live else round(t, 1)
+ 
+             for a in rules.update(t, dets, payload=frame):
+                 evidence = draw(a.payload, [], [a.box, a.student_box], f"ALERT: {a.cls} {a.conf:.2f}")
+-                publisher.event(events.make(a.cls, a.conf, a.box, a.track_id, a.duration_s, evidence, a.student_track_id))
++                publisher.event(events.make(a.cls, a.conf, a.box, a.track_id, a.duration_s, evidence, a.student_track_id,
++                                            video_t))
+                 alert_until, alert_boxes = t + 3.0, [a.box, a.student_box]
+ 
+             if behavior is not None and source.frame_idx % b.get("every_n_frames", 5) == 0:
+@@ -136,7 +193,7 @@ def main():
+                 for e in behavior.analyze(t, frame, persons):
+                     evidence = draw(frame, [], [e["box"]], "ALERT: head turn")
+                     publisher.event(events.make("head_turn", e["confidence"], e["box"], e["track_id"],
+-                                                e["duration_s"], evidence, e["track_id"]))
++                                                e["duration_s"], evidence, e["track_id"], video_t))
+ 
+             now_tick = time.perf_counter()
+             fps_ema = 0.9 * fps_ema + 0.1 * (1.0 / max(now_tick - last_tick, 1e-6)) if fps_ema else 1.0 / max(now_tick - last_tick, 1e-6)
+@@ -157,6 +214,11 @@ def main():
+                 if cv2.waitKey(1) & 0xFF == ord("q"):
+                     break
+ 
++            if last_summary is None:
++                last_summary = t
++            elif t - last_summary >= cfg["output"]["status_every_s"]:
++                last_summary = t
++                print(summary.line(t), flush=True)
+             if time.time() - last_status >= cfg["output"]["status_every_s"]:
+                 last_status = time.time()
+                 publisher.status({"camera_id": cfg["camera"]["id"],
+@@ -168,6 +230,8 @@ def main():
+     finally:
+         source.close()
+         publisher.close()
++        if dump:
++            dump.close()
+         if writer is not None:
+             writer.release()
+         if mjpeg:
+diff --git a/exam-behavior-monitor-setup/ai_service/publisher.py b/exam-behavior-monitor-setup/ai_service/publisher.py
+index dae8f1e..8a266b2 100644
+--- a/exam-behavior-monitor-setup/ai_service/publisher.py
++++ b/exam-behavior-monitor-setup/ai_service/publisher.py
+@@ -17,13 +17,12 @@ class EventPublisher:
+ 
+             self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"ai-{cfg['camera']['id']}")
+             self.client.connect_async(cfg["mqtt"]["host"], int(cfg["mqtt"]["port"]), keepalive=30)
+-            self.client.loop_start()
++            self.client.loop_start()  # tự kết nối lại nếu Mosquitto khởi động sau hoặc bị ngắt
+ 
+     def event(self, payload):
+         text = json.dumps(payload, ensure_ascii=False)
+         if self.dry_run:
+-            self.events_file.write(text + "
+-")
++            self.events_file.write(text + "\n")
+             self.events_file.flush()
+         else:
+             self.client.publish(self.topic_events, text, qos=1)
+diff --git a/exam-behavior-monitor-setup/config.yaml b/exam-behavior-monitor-setup/config.yaml
+index cd903ed..f898920 100644
+--- a/exam-behavior-monitor-setup/config.yaml
++++ b/exam-behavior-monitor-setup/config.yaml
+@@ -8,10 +8,10 @@ model:
+   weights: weights/checkpoint_best_total.pth
+   size: medium                 # nano | small | medium, phải đúng với lúc train
+   threshold: 0.3               # khung có độ tin cậy từ mức này mới được vẽ và theo dõi
+-  optimize: true               # gọi optimize_for_inference() của rfdetr để chạy nhanh hơn
++  optimize: true               # biên dịch mô hình trước khi chạy (rfdetr 1.11: inference()); laptop RTX 5050: 27 FPS thay vì 14
+ 
+ rules:
+-  alert_classes: [phone]       # thêm calculator khi môn thi cấm máy tính cầm tay
++  alert_classes: [phone, calculator]   # demo 31/10: báo mọi thiết bị điện tử, vì mô hình còn nhầm điện thoại cầm tay thành calculator
+   min_confidence: 0.5          # khung điện thoại dưới mức này không tính
+   window_s: 2.0                # xét trong cửa sổ 2 giây gần nhất
+   min_ratio: 0.6               # phải thấy ở ít nhất 60% số khung trong cửa sổ
+diff --git a/exam-behavior-monitor-setup/requirements-backend.txt b/exam-behavior-monitor-setup/requirements-backend.txt
+index ac2ae11..f66034b 100644
+--- a/exam-behavior-monitor-setup/requirements-backend.txt
++++ b/exam-behavior-monitor-setup/requirements-backend.txt
+@@ -1,7 +1,7 @@
++# Backend và sự kiện giả (máy của C, laptop nhóm trưởng). Không cần GPU.
+ fastapi
+ uvicorn[standard]
+-paho-mqtt
++paho-mqtt>=2.0
+ pyyaml
+-pydantic
+ pillow
+-pytest
++amqtt          # máy chủ MQTT bằng Python (tools/mqtt_broker.py), dùng khi chưa cài Mosquitto
+diff --git a/exam-behavior-monitor-setup/run_demo.ps1 b/exam-behavior-monitor-setup/run_demo.ps1
+new file mode 100644
+index 0000000..2b49051
+--- /dev/null
++++ b/exam-behavior-monitor-setup/run_demo.ps1
+@@ -0,0 +1,23 @@
++# Bật toàn bộ hệ thống cho buổi demo, mỗi phần một cửa sổ. Chạy từ thư mục gốc repo:
++#   powershell -ExecutionPolicy Bypass -File run_demo.ps1                        # camera thật (RTSP_URL trong .env)
++#   powershell -ExecutionPolicy Bypass -File run_demo.ps1 -Source videos\test1.mp4   # video dự phòng
++#   powershell -ExecutionPolicy Bypass -File run_demo.ps1 -Mosquitto              # dùng Mosquitto thay máy chủ MQTT bằng Python
++param([string]$Source = "", [switch]$Mosquitto)
++
++$py = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
++Set-Location $PSScriptRoot
++
++if ($Mosquitto) {
++    Start-Process "C:\Program Files\mosquitto\mosquitto.exe" -ArgumentList "-c", "tools\mosquitto.conf", "-v"
++} else {
++    Start-Process $py -ArgumentList "tools\mqtt_broker.py"
++}
++Start-Sleep -Seconds 3
++Start-Process $py -ArgumentList "-m", "uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000"
++Start-Sleep -Seconds 4
++
++$aiArgs = @("-m", "ai_service.main", "--show")
++if ($Source) { $aiArgs += @("--source", $Source) }
++Start-Process $py -ArgumentList $aiArgs
++Start-Sleep -Seconds 8
++Start-Process "http://localhost:8000/ui/"
+diff --git a/exam-behavior-monitor-setup/tests/test_tune_rules.py b/exam-behavior-monitor-setup/tests/test_tune_rules.py
+new file mode 100644
+index 0000000..81e7361
+--- /dev/null
++++ b/exam-behavior-monitor-setup/tests/test_tune_rules.py
+@@ -0,0 +1,71 @@
++"""Kiểm thử công cụ chỉnh ngưỡng bằng video giả: python tests/test_tune_rules.py"""
++import json
++import os
++import subprocess
++import sys
++import tempfile
++
++ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++sys.path.insert(0, ROOT)
++from tools.tune_rules import mmss, score  # noqa: E402
++
++
++def test_mmss():
++    assert mmss("01:30") == 90 and mmss("90") == 90 and mmss("0:00:05") == 5
++
++
++def test_score_counts_hits_false_alarms_and_outside():
++    scenes = [(30, 45, "phone"), (45, 120, "normal"), (120, 135, "phone"), (135, 200, "normal")]
++    hits, misses, fa, outside, normal_min = score([33, 47.5, 80, 250], scenes)
++    # 33 trúng cảnh phone 1; 47.5 nằm trong 3 giây sau cảnh phone 1 nên vẫn tính là trúng; 80 là báo sai;
++    # 250 nằm ngoài kịch bản; cảnh phone thứ 2 bị bỏ sót
++    assert (hits, misses, fa, outside) == (1, 1, 1, 1) and abs(normal_min - (75 + 65) / 60) < 1e-9
++
++
++def test_end_to_end_on_fake_video():
++    fps, frames = 10, []
++    for i in range(600):                                   # 60 giây
++        t = i / fps
++        d = [[1, "student", 0.9, 100, 100, 300, 400]]
++        if 10 <= t < 20 or 40 <= t < 42.5:                 # 2 cảnh điện thoại: 10 giây và 2,5 giây
++            d.append([2, "phone", 0.55, 180, 250, 220, 300])
++        if 30 <= t < 30.8:                                  # thoáng qua 0,8 giây ở cảnh bình thường: không được báo
++            d.append([3, "phone", 0.7, 180, 250, 220, 300])
++        frames.append({"t": t, "d": d})
++    with tempfile.TemporaryDirectory() as tmp:
++        dets = os.path.join(tmp, "dets.jsonl")
++        with open(dets, "w", encoding="utf-8") as f:
++            f.write(json.dumps({"video": "fake.mp4", "fps": fps, "threshold": 0.2}) + "\n")
++            f.writelines(json.dumps(r) + "\n" for r in frames)
++        scenes = os.path.join(tmp, "scenes.csv")
++        with open(scenes, "w", encoding="utf-8") as f:
++            f.write("video,bat_dau,ket_thuc,loai\nfake.mp4,00:10,00:20,phone\nfake.mp4,00:20,00:40,normal\n"
++                    "fake.mp4,00:40,00:42.5,phone\nfake.mp4,00:42.5,01:00,normal\n")
++        out = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "tune_rules.py"), "--dets", dets,
++                              "--scenes", scenes, "--top", "3"], capture_output=True, text=True, encoding="utf-8")
++        assert out.returncode == 0, out.stderr
++        first_row = [line for line in out.stdout.splitlines() if "|" in line][1]
++        assert "2/2" in first_row and first_row.split("|")[1].split()[1] == "0", out.stdout
++        print(out.stdout)
++
++        # Phương án báo cả máy tính: điện thoại bị nhận thành calculator vẫn được tính là bắt được cảnh phone
++        with open(dets, "w", encoding="utf-8") as f:
++            f.write(json.dumps({"video": "fake.mp4", "fps": fps, "threshold": 0.2}) + "\n")
++            for r in frames:
++                f.write(json.dumps({"t": r["t"], "d": [d if d[1] != "phone" else [d[0], "calculator"] + d[2:]
++                                                       for d in r["d"]]}) + "\n")
++        only_phone = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "tune_rules.py"), "--dets", dets,
++                                     "--scenes", scenes, "--top", "1"], capture_output=True, text=True, encoding="utf-8")
++        both = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "tune_rules.py"), "--dets", dets,
++                               "--scenes", scenes, "--top", "1", "--alert-class", "phone", "calculator"],
++                              capture_output=True, text=True, encoding="utf-8")
++        assert "0/2" in [l for l in only_phone.stdout.splitlines() if "|" in l][1], only_phone.stdout
++        assert "2/2" in [l for l in both.stdout.splitlines() if "|" in l][1], both.stdout
++
++
++if __name__ == "__main__":
++    sys.stdout.reconfigure(encoding="utf-8")               # in bảng kết quả tiếng Việt khi ghi ra file trên Windows
++    for name, fn in list(globals().items()):
++        if name.startswith("test_"):
++            fn()
++            print("OK ", name)
+diff --git a/exam-behavior-monitor-setup/tools/__init__.py b/exam-behavior-monitor-setup/tools/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/exam-behavior-monitor-setup/tools/mqtt_broker.py b/exam-behavior-monitor-setup/tools/mqtt_broker.py
+new file mode 100644
+index 0000000..ab8062e
+--- /dev/null
++++ b/exam-behavior-monitor-setup/tools/mqtt_broker.py
+@@ -0,0 +1,37 @@
++"""Máy chủ MQTT dự phòng viết bằng Python (amqtt), dùng khi chưa cài được Mosquitto.
++
++    python tools/mqtt_broker.py                 # lắng nghe 0.0.0.0:1883, giống Mosquitto với tools/mosquitto.conf
++    python tools/mqtt_broker.py --port 18830
++
++Chỉ chạy trong mạng riêng của nhóm (router, hotspot); máy chủ này không đòi mật khẩu.
++"""
++import argparse
++import asyncio
++
++from amqtt.broker import Broker
++
++
++def main():
++    ap = argparse.ArgumentParser()
++    ap.add_argument("--host", default="0.0.0.0")
++    ap.add_argument("--port", type=int, default=1883)
++    args = ap.parse_args()
++    config = {
++        "listeners": {"default": {"type": "tcp", "bind": f"{args.host}:{args.port}"}},
++        "plugins": {"amqtt.plugins.authentication.AnonymousAuthPlugin": {"allow_anonymous": True}},
++    }
++
++    async def run():
++        broker = Broker(config)
++        await broker.start()
++        print(f"Máy chủ MQTT đang chạy ở {args.host}:{args.port} (Ctrl+C để dừng)", flush=True)
++        await asyncio.Event().wait()
++
++    try:
++        asyncio.run(run())
++    except KeyboardInterrupt:
++        pass
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/exam-behavior-monitor-setup/tools/tune_rules.py b/exam-behavior-monitor-setup/tools/tune_rules.py
+new file mode 100644
+index 0000000..0e3da4d
+--- /dev/null
++++ b/exam-behavior-monitor-setup/tools/tune_rules.py
+@@ -0,0 +1,146 @@
++"""Chỉnh ngưỡng luật vi phạm trên video thật mà không phải chạy lại RF-DETR cho mỗi lần thử.
++
++Bước 1 (Colab hoặc laptop): chạy RF-DETR một lần trên mỗi video buổi 1, lưu kết quả phát hiện từng khung.
++    python -m ai_service.main --source buoi1_000.mp4 --dry-run --out runs/buoi1_000 \
++        --threshold 0.2 --dump-dets runs/buoi1_000/dets.jsonl
++
++Bước 2: A gửi file đáp án scenes.csv (lấy từ kịch bản quay, thời gian tính trong từng file video):
++    video,bat_dau,ket_thuc,loai
++    buoi1_000.mp4,00:30,00:45,phone
++    buoi1_000.mp4,00:45,02:10,normal
++    buoi1_000.mp4,02:10,02:25,calculator
++  loai: phone (đang dùng điện thoại), normal (làm bài bình thường), hoặc tên cảnh khác (calculator, head_turn…).
++
++Bước 3: thử nhiều bộ ngưỡng, mỗi bộ chỉ mất một phần giây:
++    python tools/tune_rules.py --dets runs/buoi1_*/dets.jsonl --scenes scenes_buoi1.csv
++
++Cách tính:
++  - Bắt được: cảnh phone có ít nhất một cảnh báo trong khoảng [bắt đầu, kết thúc + 3 giây].
++  - Báo sai: cảnh báo rơi vào cảnh không phải phone.
++  - Ngoài kịch bản: cảnh báo rơi vào đoạn không có trong scenes.csv (không tính là sai, nhưng nên xem lại).
++"""
++import argparse
++import csv
++import glob
++import itertools
++import json
++import os
++import sys
++
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++from ai_service.rules import Det, ViolationRules  # noqa: E402
++
++TOLERANCE_S = 3.0
++
++
++def mmss(text):
++    parts = [float(p) for p in str(text).strip().split(":")]
++    sec = 0.0
++    for p in parts:
++        sec = sec * 60 + p
++    return sec
++
++
++def load_dets(path):
++    with open(path, encoding="utf-8") as f:
++        meta = json.loads(f.readline())
++        frames = []
++        for line in f:
++            row = json.loads(line)
++            frames.append((row["t"], [Det(d[0], d[1], d[2], tuple(d[3:7])) for d in row["d"]]))
++    return meta, frames
++
++
++def load_scenes(path):
++    scenes = {}
++    with open(path, encoding="utf-8-sig") as f:
++        for row in csv.DictReader(f):
++            scenes.setdefault(row["video"].strip(), []).append(
++                (mmss(row["bat_dau"]), mmss(row["ket_thuc"]), row["loai"].strip().lower()))
++    return scenes
++
++
++def run_rules(frames, params, alert_classes):
++    rules = ViolationRules(alert_classes, params["min_confidence"], params["window_s"], params["min_ratio"],
++                           params["cooldown_s"])
++    return [t for t, dets in frames for _ in rules.update(t, dets)]
++
++
++def score(alert_times, scenes, target="phone"):
++    hits = misses = false_alarms = outside = 0
++    for start, end, kind in scenes:
++        if kind == target:
++            if any(start <= t <= end + TOLERANCE_S for t in alert_times):
++                hits += 1
++            else:
++                misses += 1
++    for t in alert_times:
++        inside = [kind for start, end, kind in scenes if start <= t <= end + (TOLERANCE_S if kind == target else 0)]
++        if target in inside:
++            continue
++        if inside:
++            false_alarms += 1
++        else:
++            outside += 1
++    normal_min = sum(end - start for start, end, kind in scenes if kind == "normal") / 60
++    return hits, misses, false_alarms, outside, normal_min
++
++
++def main():
++    # Windows ghi ra file hoặc ống dẫn bằng bảng mã cp1252, không in được tiếng Việt
++    sys.stdout.reconfigure(encoding="utf-8")
++    sys.stderr.reconfigure(encoding="utf-8")
++    ap = argparse.ArgumentParser(description="Thử nhiều bộ ngưỡng luật vi phạm trên kết quả phát hiện đã lưu")
++    ap.add_argument("--dets", nargs="+", required=True, help="file dets.jsonl (dùng được dấu *)")
++    ap.add_argument("--scenes", required=True)
++    ap.add_argument("--alert-class", nargs="+", default=["phone"],
++                    help="lớp được báo; ví dụ --alert-class phone calculator để thử phương án báo cả máy tính")
++    ap.add_argument("--target", default="phone", help="loại cảnh trong scenes.csv được coi là vi phạm cần bắt")
++    ap.add_argument("--cooldown", type=float, default=10.0,
++                    help="khi chỉnh nên để ngắn hơn lúc chạy thật (30 giây) để các cảnh liền nhau không bị nuốt")
++    ap.add_argument("--top", type=int, default=10)
++    args = ap.parse_args()
++
++    paths = sorted({p for pattern in args.dets for p in glob.glob(pattern)})
++    if not paths:
++        sys.exit("Không thấy file dets.jsonl nào")
++    scenes = load_scenes(args.scenes)
++    videos = []
++    for p in paths:
++        meta, frames = load_dets(p)
++        if meta["video"] not in scenes:
++            print(f"[bỏ qua] {p}: video {meta['video']} không có trong {args.scenes}")
++            continue
++        videos.append((meta, frames, scenes[meta["video"]]))
++        print(f"{meta['video']}: {len(frames)} khung, {len(scenes[meta['video']])} cảnh, ngưỡng phát hiện {meta['threshold']}")
++    if not videos:
++        sys.exit("Không có video nào khớp giữa dets và scenes.csv")
++
++    grid = {"min_confidence": [0.3, 0.4, 0.5, 0.6], "window_s": [1.0, 1.5, 2.0, 3.0],
++            "min_ratio": [0.4, 0.5, 0.6, 0.7], "cooldown_s": [args.cooldown]}
++    results = []
++    for combo in itertools.product(*grid.values()):
++        params = dict(zip(grid, combo))
++        total = [0, 0, 0, 0, 0.0]
++        for meta, frames, sc in videos:
++            for k, v in enumerate(score(run_rules(frames, params, args.alert_class), sc, args.target)):
++                total[k] += v
++        results.append((params, *total))
++
++    # Ưu tiên bắt được nhiều nhất, rồi ít báo sai nhất, rồi cửa sổ dài hơn (ổn định hơn)
++    results.sort(key=lambda r: (-r[1], r[3], -r[0]["window_s"], -r[0]["min_confidence"]))
++    n_phone = results[0][1] + results[0][2]
++    normal_min = results[0][5]
++    print(f"\nBáo các lớp {args.alert_class}; {n_phone} cảnh '{args.target}', {normal_min:.1f} phút làm bài bình thường\n")
++    print(f"{'min_conf':>8} {'window':>6} {'ratio':>5} | {'bắt được':>9} {'báo sai':>7} {'ngoài KB':>8}")
++    for params, hits, misses, fa, outside, _ in results[:args.top]:
++        print(f"{params['min_confidence']:>8} {params['window_s']:>6} {params['min_ratio']:>5} | "
++              f"{hits:>4}/{n_phone:<4} {fa:>7} {outside:>8}")
++    best = results[0][0]
++    print("\nGhi vào config.yaml (mục rules), giữ cooldown_s: 30 khi chạy thật:")
++    print(f"  alert_classes: [{', '.join(args.alert_class)}]")
++    print(f"  min_confidence: {best['min_confidence']}\n  window_s: {best['window_s']}\n  min_ratio: {best['min_ratio']}")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/exam-behavior-monitor-setup/ui/index.html b/exam-behavior-monitor-setup/ui/index.html
+index 0b12919..73c3ddc 100644
+--- a/exam-behavior-monitor-setup/ui/index.html
++++ b/exam-behavior-monitor-setup/ui/index.html
+@@ -93,7 +93,16 @@ const STATUS_VI = { new: "Mới", confirmed: "Đã xác nhận", dismissed: "Đ
+ const FPS_MIN = 10;   // dưới mức này thì báo FPS thấp (tiêu chí nghiệm thu: từ 10 khung/giây)
+ let selected = null, alertUntil = 0, lastStatus = {};
+ 
+-document.getElementById("video").src = VIDEO;
++const videoEl = document.getElementById("video");
++let snapTimer = null;
++function useSnapshots() {   // trình duyệt không hiện được MJPEG: chuyển sang tải ảnh tĩnh liên tục từ dịch vụ AI
++  if (snapTimer) return;
++  const snapUrl = VIDEO.replace(/\/video.*$/, "/snapshot.jpg");
++  snapTimer = setInterval(() => { videoEl.src = `${snapUrl}?t=${Date.now()}`; }, 150);
++}
++videoEl.onerror = useSnapshots;
++videoEl.src = VIDEO;
++setTimeout(() => { if (!videoEl.naturalWidth) useSnapshots(); }, 4000);
+ const fmtTime = ts => new Date(ts).toLocaleTimeString("vi-VN");
+ 
+ function renderState() {

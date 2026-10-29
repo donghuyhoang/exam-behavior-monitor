@@ -93,7 +93,16 @@ const STATUS_VI = { new: "Mới", confirmed: "Đã xác nhận", dismissed: "Đ�
 const FPS_MIN = 10;   // dưới mức này thì báo FPS thấp (tiêu chí nghiệm thu: từ 10 khung/giây)
 let selected = null, alertUntil = 0, lastStatus = {};
 
-document.getElementById("video").src = VIDEO;
+const videoEl = document.getElementById("video");
+let snapTimer = null;
+function useSnapshots() {   // trình duyệt không hiện được MJPEG: chuyển sang tải ảnh tĩnh liên tục từ dịch vụ AI
+  if (snapTimer) return;
+  const snapUrl = VIDEO.replace(/\/video.*$/, "/snapshot.jpg");
+  snapTimer = setInterval(() => { videoEl.src = `${snapUrl}?t=${Date.now()}`; }, 150);
+}
+videoEl.onerror = useSnapshots;
+videoEl.src = VIDEO;
+setTimeout(() => { if (!videoEl.naturalWidth) useSnapshots(); }, 4000);
 const fmtTime = ts => new Date(ts).toLocaleTimeString("vi-VN");
 
 function renderState() {

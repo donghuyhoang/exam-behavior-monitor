@@ -1,7 +1,7 @@
+# Backend và sự kiện giả (máy của C, laptop nhóm trưởng). Không cần GPU.
 fastapi
 uvicorn[standard]
-paho-mqtt
+paho-mqtt>=2.0
 pyyaml
-pydantic
 pillow
-pytest
+amqtt          # máy chủ MQTT bằng Python (tools/mqtt_broker.py), dùng khi chưa cài Mosquitto

@@ -17,13 +17,12 @@ class EventPublisher:
 
             self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"ai-{cfg['camera']['id']}")
             self.client.connect_async(cfg["mqtt"]["host"], int(cfg["mqtt"]["port"]), keepalive=30)
-            self.client.loop_start()
+            self.client.loop_start()  # tự kết nối lại nếu Mosquitto khởi động sau hoặc bị ngắt
 
     def event(self, payload):
         text = json.dumps(payload, ensure_ascii=False)
         if self.dry_run:
-            self.events_file.write(text + "
-")
+            self.events_file.write(text + "\n")
             self.events_file.flush()
         else:
             self.client.publish(self.topic_events, text, qos=1)
