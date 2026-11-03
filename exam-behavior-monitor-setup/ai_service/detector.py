@@ -4,13 +4,16 @@ from PIL import Image
 
 
 class RFDETRDetector:
-    def __init__(self, weights, size="medium", threshold=0.3, optimize=True, fp16=False):
+    def __init__(self, weights, size="medium", threshold=0.3, optimize=True, fp16=False, resolution=None):
         # Đo trên RTX 5050 laptop (28/10): tối ưu FP32 27 FPS, FP16 21 FPS, không tối ưu 14 FPS -> mặc định FP32
         import rfdetr
         import torch
 
         model_cls = {"nano": rfdetr.RFDETRNano, "small": rfdetr.RFDETRSmall, "medium": rfdetr.RFDETRMedium}[size]
-        self.model = model_cls(pretrain_weights=weights)
+        kwargs = {"pretrain_weights": weights}
+        if resolution:  # mô hình train ở resolution khác mặc định (ví dụ 704) thì phải nạp đúng giá trị đó
+            kwargs["resolution"] = int(resolution)
+        self.model = model_cls(**kwargs)
         if optimize:
             try:
                 if hasattr(self.model, "optimize_for_inference"):

@@ -41,6 +41,8 @@
   .filters label { display:flex; align-items:center; gap:6px; color:var(--muted); }
   select, input[type=datetime-local] { font:inherit; color-scheme:dark; background:#243040; color:var(--text); border:1px solid var(--line); border-radius:4px; padding:4px 8px; }
   .filters .count { align-self:center; margin-left:auto; }
+  header .spacer { flex:1; }
+  button.on { background:var(--ok); border-color:var(--ok); color:#06150d; }
 </style>
 </head>
 <body>
@@ -48,6 +50,8 @@
   <h1>Giám sát phòng thi · <span id="camera">room1-cam1</span></h1>
   <span id="state" class="chip off">Đang kết nối…</span>
   <span id="fps" class="muted"></span>
+  <span class="spacer"></span>
+  <button id="btn-sound" type="button" aria-pressed="false">Bật âm báo</button>
 </header>
 <main>
   <section class="panel">
@@ -76,6 +80,7 @@
       <button id="btn-today" type="button">Hôm nay</button>
       <button id="btn-clear" type="button">Xóa lọc</button>
       <button id="btn-reload" type="button">Tải lại</button>
+      <button id="btn-csv" type="button">Xuất CSV</button>
       <span id="h-count" class="muted count"></span>
     </div>
     <div class="table-wrap"><table>
@@ -147,14 +152,18 @@ async function setStatus(status) {
 document.getElementById("btn-confirm").onclick = () => setStatus("confirmed");
 document.getElementById("btn-dismiss").onclick = () => setStatus("dismissed");
 
-async function loadHistory() {
-  const q = new URLSearchParams({ limit: 200 });
+function historyQuery(limit) {   // dùng chung cho bảng lịch sử và nút Xuất CSV: cùng bộ lọc
+  const q = new URLSearchParams({ limit });
   const t = document.getElementById("f-type").value, s = document.getElementById("f-status").value;
   if (t) q.set("type", t); if (s) q.set("status", s);
   const from = document.getElementById("f-from").value, to = document.getElementById("f-to").value;
   if (from) q.set("from", from + ":00");   // so sánh chuỗi với ts ISO của backend (cùng múi giờ máy)
   if (to) q.set("to", to + ":59");
-  const rows = await (await fetch(`${API}/api/events?${q}`)).json();
+  return q;
+}
+
+async function loadHistory() {
+  const rows = await (await fetch(`${API}/api/events?${historyQuery(200)}`)).json();
   document.getElementById("history").innerHTML = rows.map(e => `<tr>
     <td>${new Date(e.ts).toLocaleString("vi-VN")}</td><td>${TYPE_VI[e.type] || e.type}</td>
     <td>${(e.confidence * 100).toFixed(0)}%</td><td>#${e.student_track_id ?? "?"}</td><td>${STATUS_VI[e.status]}</td>
@@ -176,11 +185,54 @@ document.getElementById("btn-clear").onclick = () => {
 };
 document.getElementById("btn-reload").onclick = loadHistory;
 
+// Xuất danh sách vi phạm theo bộ lọc hiện tại ra CSV (có BOM để Excel đọc đúng tiếng Việt)
+const csvCell = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+document.getElementById("btn-csv").onclick = async () => {
+  const rows = await (await fetch(`${API}/api/events?${historyQuery(1000)}`)).json();
+  const header = ["Thời gian", "Loại", "Độ tin cậy (%)", "Thí sinh (track)", "Kéo dài (giây)", "Trạng thái", "Ảnh bằng chứng", "Mã sự kiện"];
+  const lines = rows.map(e => [new Date(e.ts).toLocaleString("vi-VN"), TYPE_VI[e.type] || e.type, (e.confidence * 100).toFixed(0),
+    e.student_track_id ?? "", e.duration_s ?? "", STATUS_VI[e.status] || e.status, e.snapshot_url ? API + e.snapshot_url : "", e.event_id]);
+  const csv = "\ufeff" + [header, ...lines].map(r => r.map(csvCell).join(",")).join("\r\n");
+  const d = new Date(), stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+  const a = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })), download: `vi_pham_${stamp}.csv` });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+// Âm báo: trình duyệt chỉ cho phát âm thanh sau khi người dùng bấm, nên giám thị bấm "Bật âm báo" một lần đầu buổi
+let audioCtx = null, soundOn = false;
+function beep(type) {
+  if (!soundOn || !audioCtx) return;
+  const freq = type === "head_turn" ? 520 : 880;   // quay đầu: tiếng trầm hơn điện thoại / máy tính
+  [0, 0.25].forEach(delay => {
+    const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.25, audioCtx.currentTime + delay);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + 0.18);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(audioCtx.currentTime + delay);
+    osc.stop(audioCtx.currentTime + delay + 0.2);
+  });
+}
+document.getElementById("btn-sound").onclick = async e => {
+  const btn = e.currentTarget;   // lấy trước khi await: sau await thì e.currentTarget đã là null
+  soundOn = !soundOn;
+  if (soundOn) {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    await audioCtx.resume();
+    beep("phone");   // phát thử một lần để giám thị chỉnh âm lượng
+  }
+  btn.textContent = soundOn ? "Tắt âm báo" : "Bật âm báo";
+  btn.classList.toggle("on", soundOn);
+  btn.setAttribute("aria-pressed", String(soundOn));
+};
+
 function connect() {
   const ws = new WebSocket(API.replace(/^http/, "ws") + "/ws/events");
   ws.onmessage = msg => {
     const m = JSON.parse(msg.data);
-    if (m.kind === "event") { addAlert(m.data, true); alertUntil = Date.now() + 5000; loadHistory(); }
+    if (m.kind === "event") { addAlert(m.data, true); alertUntil = Date.now() + 5000; beep(m.data.type); loadHistory(); }
     if (m.kind === "status") { lastStatus = m.data; document.getElementById("camera").textContent = m.data.camera_id || ""; }
     renderState();
   };

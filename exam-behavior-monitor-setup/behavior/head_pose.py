@@ -21,7 +21,7 @@ NOSE_TIP, EYE_OUTER_R, EYE_OUTER_L = 1, 33, 263
 
 class HeadTurnDetector:
     def __init__(self, model_path=ROOT / "weights" / "face_landmarker.task", yaw_ratio=0.35, min_duration_s=3.0,
-                 cooldown_s=30.0, min_face_px=40, head_fraction=0.45):
+                 cooldown_s=30.0, min_face_px=20, head_fraction=0.45, upscale_to=160):
         options = vision.FaceLandmarkerOptions(
             base_options=mp_python.BaseOptions(model_asset_path=str(model_path)),
             running_mode=vision.RunningMode.IMAGE, num_faces=1)
@@ -31,6 +31,7 @@ class HeadTurnDetector:
         self.cooldown_s = cooldown_s
         self.min_face_px = min_face_px
         self.head_fraction = head_fraction
+        self.upscale_to = upscale_to   # camera xa nên đầu chỉ vài chục pixel: phóng to trước khi tìm mặt
         self.state = {}
 
     def head_crop(self, frame, box):
@@ -43,6 +44,10 @@ class HeadTurnDetector:
     def ratio(self, crop_bgr):
         if crop_bgr.size == 0 or min(crop_bgr.shape[:2]) < self.min_face_px:
             return None
+        short = min(crop_bgr.shape[:2])
+        if self.upscale_to and short < self.upscale_to:
+            k = self.upscale_to / short
+            crop_bgr = cv2.resize(crop_bgr, None, fx=k, fy=k, interpolation=cv2.INTER_CUBIC)
         rgb = np.ascontiguousarray(cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB))
         result = self.landmarker.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb))
         if not result.face_landmarks:
@@ -82,12 +87,13 @@ def main():
     ap.add_argument("--every", type=int, default=10, help="phân tích 1 khung trong N khung")
     args = ap.parse_args()
     m = load_config()["model"]
-    det = RFDETRDetector(str(ROOT / m["weights"]), m.get("size", "medium"), m.get("threshold", 0.3))
+    det = RFDETRDetector(str(ROOT / m["weights"]), m.get("size", "medium"), m.get("threshold", 0.3),
+                         resolution=m.get("resolution"))
     tracker = IouTracker()
     head = HeadTurnDetector()
     cap = cv2.VideoCapture(args.video)
     fps = cap.get(cv2.CAP_PROP_FPS) or 25
-    i = 0
+    i, seen, faces = 0, 0, 0
     while True:
         ok, frame = cap.read()
         if not ok:
@@ -100,8 +106,12 @@ def main():
         for d in dets:
             if d.cls == "student":
                 r = head.ratio(head.head_crop(frame, d.box))
+                seen += 1
+                faces += r is not None
                 found.append(f"#{d.track_id}:{'không thấy mặt' if r is None else f'{r:+.2f}'}")
         print(f"{i / fps:6.1f}s  " + "  ".join(found))
+    print(f"\nThấy mặt {faces}/{seen} lần ({100 * faces / max(seen, 1):.0f}%). Dưới khoảng 50% thì thử --method pose "
+          "(python -m behavior.pose_turn --video ...)")
 
 
 if __name__ == "__main__":

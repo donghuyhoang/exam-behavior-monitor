@@ -31,7 +31,8 @@ def main():
 
     m = load_config()["model"]
     det = RFDETRDetector(str(ROOT / m["weights"]), m.get("size", "medium"), m.get("threshold", 0.3),
-                         optimize=not args.no_optimize)
+                         optimize=not args.no_optimize, resolution=m.get("resolution"))
+    print(f"resolution: {m.get('resolution') or 'mặc định'}")
     for f in frames[:10]:
         det(f)
     if torch.cuda.is_available():

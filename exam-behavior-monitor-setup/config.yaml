@@ -7,6 +7,7 @@ camera:
 model:
   weights: weights/checkpoint_best_total.pth
   size: medium                 # nano | small | medium, phải đúng với lúc train
+  resolution: null             # ảnh vào mô hình; null = mặc định của bản Medium (576). Checkpoint v5 train ở 704 thì ghi 704
   threshold: 0.3               # khung có độ tin cậy từ mức này mới được vẽ và theo dõi
   optimize: true               # biên dịch mô hình trước khi chạy (rfdetr 1.11: inference()); laptop RTX 5050: 27 FPS thay vì 14
 
@@ -18,7 +19,8 @@ rules:
   cooldown_s: 30               # mỗi thí sinh nghỉ 30 giây rồi mới báo lại
 
 behavior:
-  enabled: false               # bật khi đã có module MediaPipe (P1)
+  enabled: false               # bật khi đã thử xong trên video buổi 2
+  method: face                 # face: Face Landmarker (behavior/head_pose.py) | pose: Pose Landmarker (behavior/pose_turn.py)
   every_n_frames: 5            # MediaPipe chậm, chỉ chạy 1 khung trong 5 khung
   yaw_ratio: 0.35              # mũi lệch khỏi giữa hai mắt quá 35% khoảng cách hai mắt thì coi là quay đầu
   min_duration_s: 3.0

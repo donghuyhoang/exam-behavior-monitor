@@ -2,6 +2,9 @@
 
     python tools/export_preds_rfdetr.py --images test_camera --weights weights/checkpoint_best_total.pth \
         --out predictions_camera/pred_rfdetr_m.json
+    # checkpoint train ở resolution 704:
+    python tools/export_preds_rfdetr.py --images test_camera --weights rfdetr_m_v5/checkpoint_best_total.pth \
+        --resolution 704 --out predictions_camera/pred_rfdetr_m_v5.json
     python benchmark/evaluate_detections.py --gt test_camera/_annotations.coco.json \
         --pred "predictions_camera/pred_*.json" --out predictions_camera/
 """
@@ -18,13 +21,16 @@ def main():
     ap.add_argument("--images", required=True, help="thư mục ảnh (thường có _annotations.coco.json)")
     ap.add_argument("--weights", required=True)
     ap.add_argument("--size", default="medium", choices=["nano", "small", "medium"])
+    ap.add_argument("--resolution", type=int, help="resolution lúc train, ví dụ 704; bỏ trống = mặc định của mô hình")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
     import rfdetr
 
-    model = {"nano": rfdetr.RFDETRNano, "small": rfdetr.RFDETRSmall, "medium": rfdetr.RFDETRMedium}[args.size](
-        pretrain_weights=args.weights)
+    kwargs = {"pretrain_weights": args.weights}
+    if args.resolution:
+        kwargs["resolution"] = args.resolution
+    model = {"nano": rfdetr.RFDETRNano, "small": rfdetr.RFDETRSmall, "medium": rfdetr.RFDETRMedium}[args.size](**kwargs)
     names = model.class_names
     paths = sorted(p for p in glob.glob(os.path.join(args.images, "*")) if p.lower().endswith((".jpg", ".jpeg", ".png")))
     preds = []

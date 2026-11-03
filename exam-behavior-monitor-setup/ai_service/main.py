@@ -136,7 +136,8 @@ def main():
     source = FrameSource(args.source if args.source is not None else cfg["camera"]["source"])
     m = cfg["model"]
     threshold = args.threshold if args.threshold is not None else m.get("threshold", 0.3)
-    detector = RFDETRDetector(str(ROOT / m["weights"]), m.get("size", "medium"), threshold, m.get("optimize", True))
+    detector = RFDETRDetector(str(ROOT / m["weights"]), m.get("size", "medium"), threshold, m.get("optimize", True),
+                              resolution=m.get("resolution"))
     dump = None
     if args.dump_dets:
         Path(args.dump_dets).parent.mkdir(parents=True, exist_ok=True)
@@ -158,7 +159,10 @@ def main():
     behavior = None
     b = cfg.get("behavior", {})
     if b.get("enabled"):
-        from behavior.head_pose import HeadTurnDetector
+        if b.get("method", "face") == "pose":
+            from behavior.pose_turn import PoseTurnDetector as HeadTurnDetector
+        else:
+            from behavior.head_pose import HeadTurnDetector
         behavior = HeadTurnDetector(yaw_ratio=b["yaw_ratio"], min_duration_s=b["min_duration_s"], cooldown_s=b["cooldown_s"])
 
     writer = None

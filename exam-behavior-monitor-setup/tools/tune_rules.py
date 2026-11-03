@@ -13,6 +13,7 @@ Bước 2: A gửi file đáp án scenes.csv (lấy từ kịch bản quay, th�
 
 Bước 3: thử nhiều bộ ngưỡng, mỗi bộ chỉ mất một phần giây:
     python tools/tune_rules.py --dets runs/buoi1_*/dets.jsonl --scenes scenes_buoi1.csv
+    python tools/tune_rules.py --dets "runs/*/dets.jsonl" --scenes scenes_buoi1.csv scenes_buoi2.csv   # nhiều buổi
 
 Cách tính:
   - Bắt được: cảnh phone có ít nhất một cảnh báo trong khoảng [bắt đầu, kết thúc + 3 giây].
@@ -51,12 +52,14 @@ def load_dets(path):
     return meta, frames
 
 
-def load_scenes(path):
+def load_scenes(*paths):
+    """Đọc một hoặc nhiều file đáp án; các file gộp theo tên video."""
     scenes = {}
-    with open(path, encoding="utf-8-sig") as f:
-        for row in csv.DictReader(f):
-            scenes.setdefault(row["video"].strip(), []).append(
-                (mmss(row["bat_dau"]), mmss(row["ket_thuc"]), row["loai"].strip().lower()))
+    for path in paths:
+        with open(path, encoding="utf-8-sig") as f:
+            for row in csv.DictReader(f):
+                scenes.setdefault(row["video"].strip(), []).append(
+                    (mmss(row["bat_dau"]), mmss(row["ket_thuc"]), row["loai"].strip().lower()))
     return scenes
 
 
@@ -92,7 +95,7 @@ def main():
     sys.stderr.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description="Thử nhiều bộ ngưỡng luật vi phạm trên kết quả phát hiện đã lưu")
     ap.add_argument("--dets", nargs="+", required=True, help="file dets.jsonl (dùng được dấu *)")
-    ap.add_argument("--scenes", required=True)
+    ap.add_argument("--scenes", nargs="+", required=True, help="một hoặc nhiều file đáp án scenes_*.csv")
     ap.add_argument("--alert-class", nargs="+", default=["phone"],
                     help="lớp được báo; ví dụ --alert-class phone calculator để thử phương án báo cả máy tính")
     ap.add_argument("--target", default="phone", help="loại cảnh trong scenes.csv được coi là vi phạm cần bắt")
@@ -104,7 +107,7 @@ def main():
     paths = sorted({p for pattern in args.dets for p in glob.glob(pattern)})
     if not paths:
         sys.exit("Không thấy file dets.jsonl nào")
-    scenes = load_scenes(args.scenes)
+    scenes = load_scenes(*args.scenes)
     videos = []
     for p in paths:
         meta, frames = load_dets(p)
