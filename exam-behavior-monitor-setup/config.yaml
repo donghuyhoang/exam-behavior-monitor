@@ -13,9 +13,9 @@ model:
 
 rules:
   alert_classes: [phone, calculator]   # demo 31/10: báo mọi thiết bị điện tử, vì mô hình còn nhầm điện thoại cầm tay thành calculator
-  min_confidence: 0.5          # khung điện thoại dưới mức này không tính
-  window_s: 2.0                # xét trong cửa sổ 2 giây gần nhất
-  min_ratio: 0.6               # phải thấy ở ít nhất 60% số khung trong cửa sổ
+  min_confidence: 0.4          # khung điện thoại dưới mức này không tính
+  window_s: 3.0                # xét trong cửa sổ 2 giây gần nhất
+  min_ratio: 0.4               # phải thấy ở ít nhất 60% số khung trong cửa sổ
   cooldown_s: 30               # mỗi thí sinh nghỉ 30 giây rồi mới báo lại
 
 behavior:
