@@ -8,3 +8,5 @@ data/*
 runs/
 videos/
 *.mp4
+*.log
+*.ts
