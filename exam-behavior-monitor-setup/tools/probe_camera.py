@@ -27,6 +27,12 @@ PATHS = [
 ]
 
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from ai_service.stream import _open
+
+
 def port_open(ip, port, timeout=0.5):
     try:
         with socket.create_connection((str(ip), port), timeout=timeout):
@@ -36,8 +42,7 @@ def port_open(ip, port, timeout=0.5):
 
 
 def try_url(url, timeout_ms=5000, sample=40):
-    cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG,
-                           [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, timeout_ms, cv2.CAP_PROP_READ_TIMEOUT_MSEC, timeout_ms])
+    cap = _open(url)
     if not cap.isOpened():
         return None
     ok, frame = cap.read()

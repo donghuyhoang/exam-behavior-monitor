@@ -7,14 +7,14 @@ camera:
 model:
   weights: weights/checkpoint_best_total.pth
   size: medium                 # nano | small | medium, phải đúng với lúc train
-  resolution: null             # ảnh vào mô hình; null = mặc định của bản Medium (576). Checkpoint v5 train ở 704 thì ghi 704
+  resolution: 704          # ảnh vào mô hình; null = mặc định của bản Medium (576). Checkpoint v5 train ở 704 thì ghi 704
   threshold: 0.3               # khung có độ tin cậy từ mức này mới được vẽ và theo dõi
   optimize: true               # biên dịch mô hình trước khi chạy (rfdetr 1.11: inference()); laptop RTX 5050: 27 FPS thay vì 14
 
 rules:
   alert_classes: [phone, calculator]   # demo 31/10: báo mọi thiết bị điện tử, vì mô hình còn nhầm điện thoại cầm tay thành calculator
   min_confidence: 0.4          # khung điện thoại dưới mức này không tính
-  window_s: 3.0                # xét trong cửa sổ 2 giây gần nhất
+  window_s: 2.0                # xét trong cửa sổ 2 giây gần nhất
   min_ratio: 0.4               # phải thấy ở ít nhất 60% số khung trong cửa sổ
   cooldown_s: 30               # mỗi thí sinh nghỉ 30 giây rồi mới báo lại
 
