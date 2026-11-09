@@ -1,0 +1,286 @@
+﻿-- logger module started --
+main debug: VLC media player - 3.0.24 Vetinari
+main debug: Copyright © 1996-2026 the VideoLAN team
+main debug: revision 3.0.24-rc1-0-g6de05adcba
+main debug: configured with /builds/videolan/vlc/extras/package/win32/../../../configure  '--enable-lua' '--enable-faad' '--enable-flac' '--enable-theora' '--enable-avcodec' '--enable-merge-ffmpeg' '--enable-mpc' '--enable-libass' '--enable-live555' '--enable-shout' '--enable-goom' '--enable-sse' '--enable-mmx' '--enable-libcddb' '--enable-zvbi' '--disable-telx' '--enable-nls' '--host=x86_64-w64-mingw32' '--with-contrib=../contrib/x86_64-w64-mingw32' '--with-breakpad=https://win.crashes.videolan.org' '--enable-qt' '--enable-skins2' '--enable-update-check' '--enable-dvdread' '--enable-caca' 'host_alias=x86_64-w64-mingw32' 'CFLAGS= -D__MSVCRT_VERSION__=0x700 -D_WIN32_WINNT=0x0502 -DWINVER=0x0502  -g' 'CPPFLAGS= -D__MSVCRT_VERSION__=0x700 -D_WIN32_WINNT=0x0502 -DWINVER=0x0502' 'CXXFLAGS= -D__MSVCRT_VERSION__=0x700 -D_WIN32_WINNT=0x0502 -DWINVER=0x0502  -g' 'PKG_CONFIG=pkg-config' 'PKG_CONFIG_LIBDIR=/usr/x86_64-w64-mingw32/lib/pkgconfig:/usr/lib/x86_64-w64-mingw32/pkgconfig'
+main debug: using multimedia timers as clock source
+main debug:  min period: 1 ms, max period: 1000000 ms
+main debug: searching plug-in modules
+main debug: loading plugins cache file C:\Program Files\VideoLAN\VLC\plugins\plugins.dat
+main debug: recursively browsing `C:\Program Files\VideoLAN\VLC\plugins'
+main debug: plug-ins loaded: 493 modules
+main debug: looking for logger module matching "any": 2 candidates
+file debug: opening logfile `libvlc.log'
+main debug: using logger module "file"
+main debug: translation test: code is "C"
+main debug: looking for keystore module matching "memory": 3 candidates
+main debug: using keystore module "memory"
+main debug: CPU has capabilities MMX MMXEXT SSE SSE2 SSE3 SSSE3 SSE4.1 SSE4.2 FPU 
+main debug: creating audio output
+main debug: looking for audio output module matching "any": 6 candidates
+mmdevice debug: using default device
+main debug: using audio output module "mmdevice"
+main debug: keeping audio output
+main debug: creating audio output
+main debug: looking for audio output module matching "any": 6 candidates
+main debug: Creating an input for preparsing 'vlc'
+mmdevice debug: using default device
+main debug: using audio output module "mmdevice"
+main debug: keeping audio output
+mmdevice debug: display name changed: VLC media player (LibVLC 3.0.24)
+mmdevice debug: display name changed: VLC media player (LibVLC 3.0.24)
+mmdevice debug: display name changed: VLC media player (LibVLC 3.0.24)
+mmdevice debug: version 2 session control unavailable
+mmdevice debug: version 2 session control unavailable
+mmdevice debug: volume from -74.000000 dB to +0.000000 dB with 1.000000 dB increments
+mmdevice debug: volume from -74.000000 dB to +0.000000 dB with 1.000000 dB increments
+main debug: Creating an input for 'rtsp://192.168.100.166:554/onvif1'
+main debug: looking for meta fetcher module matching "any": 1 candidates
+main debug: using timeshift granularity of 50 MiB
+main debug: using timeshift path: C:\Users\Hi\AppData\Local\Temp
+main debug: `rtsp://admin:Saurieng2006@192.168.100.166:554/onvif1' gives access `rtsp' demux `any' path `admin:Saurieng2006@192.168.100.166:554/onvif1'
+main debug: creating demux: access='rtsp' demux='any' location='admin:Saurieng2006@192.168.100.166:554/onvif1' file='\\admin:Saurieng2006@192.168.100.166:554\onvif1'
+main debug: looking for access_demux module matching "rtsp": 15 candidates
+live555 debug: version 2026.06.24
+main warning: Password in a URI is DEPRECATED
+lua debug: Trying Lua scripts in C:\Users\Hi\AppData\Roaming\vlc\lua\meta\fetcher
+lua debug: Trying Lua scripts in C:\Program Files\VideoLAN\VLC\lua\meta\fetcher
+main debug: no meta fetcher modules matched
+main debug: looking for art finder module matching "any": 2 candidates
+lua debug: Trying Lua scripts in C:\Users\Hi\AppData\Roaming\vlc\lua\meta\art
+lua debug: Trying Lua scripts in C:\Program Files\VideoLAN\VLC\lua\meta\art
+lua debug: Trying Lua playlist script C:\Program Files\VideoLAN\VLC\lua\meta\art\00_musicbrainz.luac
+lua debug: skipping script (unmatched scope) C:\Program Files\VideoLAN\VLC\lua\meta\art\00_musicbrainz.luac
+lua debug: Trying Lua playlist script C:\Program Files\VideoLAN\VLC\lua\meta\art\01_googleimage.luac
+lua debug: skipping script (unmatched scope) C:\Program Files\VideoLAN\VLC\lua\meta\art\01_googleimage.luac
+lua debug: Trying Lua playlist script C:\Program Files\VideoLAN\VLC\lua\meta\art\02_frenchtv.luac
+lua debug: skipping script (unmatched scope) C:\Program Files\VideoLAN\VLC\lua\meta\art\02_frenchtv.luac
+lua debug: Trying Lua playlist script C:\Program Files\VideoLAN\VLC\lua\meta\art\03_lastfm.luac
+lua debug: skipping script (unmatched scope) C:\Program Files\VideoLAN\VLC\lua\meta\art\03_lastfm.luac
+main debug: no art finder modules matched
+live555 debug: RTP subsession 'video/H264'
+main debug: selecting program id=0
+live555 debug: RTP subsession 'audio/PCMA'
+live555 debug: setup start: 0.000000 stop:0.000000
+live555 debug: We have a timeout of 60 seconds
+live555 debug: play start: 0.000000 stop:0.000000
+main debug: using access_demux module "live555"
+main debug: looking for packetizer module matching "any": 25 candidates
+h264 debug: found NAL_SPS (sps_id=0)
+h264 debug: found NAL_PPS (pps_id=0 sps_id=0)
+main debug: using packetizer module "h264"
+main debug: looking for video decoder module matching "any": 17 candidates
+avcodec debug: using ffmpeg Lavc62.28.102
+avcodec debug: CPU flags: 0x004fd3db
+avcodec debug: allowing 6 thread(s) for decoding
+avcodec debug: codec (h264) started
+avcodec debug: using frame thread mode with 6 threads
+main debug: using video decoder module "avcodec"
+main debug: audio is disabled, not selecting ES 0x1
+main debug: looking for meta reader module matching "any": 2 candidates
+lua debug: Trying Lua scripts in C:\Users\Hi\AppData\Roaming\vlc\lua\meta\reader
+lua debug: Trying Lua scripts in C:\Program Files\VideoLAN\VLC\lua\meta\reader
+lua debug: Trying Lua playlist script C:\Program Files\VideoLAN\VLC\lua\meta\reader\filename.luac
+main debug: no meta reader modules matched
+main debug: `rtsp://admin:Saurieng2006@192.168.100.166:554/onvif1' successfully opened
+main debug: Buffering 0%
+main debug: Buffering 3%
+main debug: Buffering 7%
+main debug: restarting module due to input format change
+main debug: Buffering 11%
+main debug: Stream buffering done (21206 ms in 0 ms)
+main debug: removing module "avcodec"
+main debug: looking for video decoder module matching "any": 17 candidates
+avcodec debug: using ffmpeg Lavc62.28.102
+avcodec debug: CPU flags: 0x004fd3db
+avcodec debug: allowing 6 thread(s) for decoding
+avcodec debug: codec (h264) started
+avcodec debug: using frame thread mode with 6 threads
+main debug: using video decoder module "avcodec"
+avcodec debug: available hardware decoder output format 51 (dxva2_vld)
+avcodec debug: available hardware decoder output format 116 (d3d11va_vld)
+avcodec debug: available hardware decoder output format 171 (d3d11)
+avcodec debug: available software decoder output format 12 (yuvj420p)
+avcodec debug: trying format d3d11va_vld
+main debug: looking for text renderer module matching "any": 3 candidates
+freetype debug: Using DWrite backend
+freetype debug: DWrite_GetFamily(): family name: Arial
+freetype debug: DWrite_ParseFamily(): using font at index 0 with weight 400 for bold: 0, italic: 0
+freetype debug: DWrite_ParseFamily(): using font at index 1 with weight 700 for bold: 1, italic: 0
+freetype debug: DWrite_ParseFamily(): using font at index 2 with weight 400 for bold: 0, italic: 1
+freetype debug: DWrite_ParseFamily(): using font at index 3 with weight 700 for bold: 1, italic: 1
+main debug: using text renderer module "freetype"
+main debug: looking for video converter module matching "any": 24 candidates
+swscale debug: 32x32 (32x32) chroma: YUVA -> 16x16 (16x16) chroma: RGBA with scaling using Bicubic (good quality)
+main debug: using video converter module "swscale"
+main debug: looking for video converter module matching "any": 24 candidates
+yuvp debug: YUVP to YUVA converter
+main debug: using video converter module "yuvp"
+main debug: Deinterlacing available
+main debug: deinterlace -1, mode auto, is_needed 0
+main debug: looking for vout window module matching "any": 3 candidates
+main debug: no vout window modules matched
+main debug: Opening vout display wrapper
+main debug: looking for vout display module matching "any": 12 candidates
+direct3d11 debug: creating Vout EventThread
+direct3d11 debug: Win32VoutCreateWindow
+direct3d11 debug: inclinometer not found. (hr=0x80070490)
+direct3d11 debug: created video sub-window
+direct3d11 debug: Vout EventThread running
+direct3d11 debug: Created the D3D11 device type 1 level b100.
+direct3d11 debug: supports colorspace RGB Rec.709 gamma:22 range:FULL
+direct3d11 debug: supports colorspace RGB Rec.709 gamma:22 range:STUDIO
+direct3d11 debug: supports colorspace RGB Rec.2020 gamma:22 range:STUDIO
+direct3d11 debug: supports colorspace RGB Rec.2020 gamma:22 range:FULL
+direct3d11 debug: supports colorspace RGB Rec.2020 gamma:2084 range:FULL
+direct3d11 debug: supports colorspace RGB Rec.2020 gamma:2084 range:STUDIO
+direct3d11 debug: Output max luminance: 270.0, colorspace RGB Rec.709 gamma:22 range:FULL, bits per pixel 8
+direct3d11 debug: using colorspace RGB Rec.709 gamma:22 range:FULL
+direct3d11 debug: Using pixel format VA_NV12 for chroma DX11
+direct3d11 error: SetThumbNailClip failed: 0x80004005
+direct3d11 debug: using GPU render fence
+direct3d11 error: SetThumbNailClip failed: 0x80004005
+direct3d11 debug: Direct3D11 resources created
+direct3d11 debug: Direct3D11 device adapter successfully initialized
+direct3d11 debug: Direct3D11 Open Succeeded
+main debug: using vout display module "direct3d11"
+direct3d11 debug: D3D11 pool succeed with 40 surfaces (1280x720) context 0x000001edffcd5d08
+main debug: original format sz 1280x720, of (0,0), vsz 1280x720, 4cc DX11, sar 1:1, msk r0x0 g0x0 b0x0
+main debug: VoutDisplayEvent 'window state' 0
+main debug: VoutDisplayEvent 'window state' 0
+main debug: removing module "freetype"
+main debug: looking for text renderer module matching "any": 3 candidates
+direct3d11 error: SetThumbNailClip failed: 0x80004005
+freetype debug: Using DWrite backend
+freetype debug: DWrite_GetFamily(): family name: Arial
+freetype debug: DWrite_ParseFamily(): using font at index 0 with weight 400 for bold: 0, italic: 0
+freetype debug: DWrite_ParseFamily(): using font at index 1 with weight 700 for bold: 1, italic: 0
+freetype debug: DWrite_ParseFamily(): using font at index 2 with weight 400 for bold: 0, italic: 1
+freetype debug: DWrite_ParseFamily(): using font at index 3 with weight 700 for bold: 1, italic: 1
+direct3d11 error: SetThumbNailClip failed: 0x80004005
+main debug: VoutDisplayEvent 'resize' 1280x720
+main debug: using text renderer module "freetype"
+main debug: input control stopped, trashing type=22
+main debug: looking for hw decoder module matching "any": 2 candidates
+d3d11va debug: Reusing Direct3D11 device
+d3d11va debug: CreateDevice succeed
+d3d11va debug: - 'MPEG-2 variable-length decoder' is supported
+d3d11va debug: - 'MPEG-2 inverse discrete cosine transform' is supported
+d3d11va debug: - 'VC-1 variable-length decoder' is supported
+d3d11va debug: - 'VC-1 variable-length decoder 2 (Intel)' is supported
+d3d11va debug: - 'VC-1 variable-length decoder (Intel)' is supported
+d3d11va debug: - 'Windows Media Video 9 IDCT' is supported
+d3d11va debug: - 'VC-1 inverse discrete cosine transform' is supported
+d3d11va debug: - 'H.264 variable-length decoder, no film grain technology' is supported
+d3d11va debug: - 'H.264 stereo high profile, mbs flag set' is supported
+d3d11va debug: - 'H.264 stereo high profile' is supported
+d3d11va debug: - 'H.264 multiview high profile' is supported
+d3d11va debug: - 'Unknown decoder 0xc528916c-0xc0af-0x4645-0x8cb2372b6d4adc2a' is supported
+d3d11va debug: - 'Unknown decoder 0x91cd2d6e-0x897b-0x4fa1-0xb0d751dc88010e0a' is supported
+d3d11va debug: - 'Unknown decoder 0x97688186-0x56a8-0x4094-0xb543fc9daaa49f4b' is supported
+d3d11va debug: - 'Unknown decoder 0x1424d4dc-0x7cf5-0x4bb1-0x9cd7b63717a72a6b' is supported
+d3d11va debug: - 'Unknown decoder 0xc346e8a3-0xcbed-0x4d27-0x87cca70eb4dc8c27' is supported
+d3d11va debug: - 'Unknown decoder 0xffc79924-0x5eaf-0x4666-0xa73606190f281443' is supported
+d3d11va debug: - 'Unknown decoder 0x464bdb3c-0x91c4-0x4e9b-0x896f225496ac4ed6' is supported
+d3d11va debug: - 'Unknown decoder 0x9b31316b-0xf204-0x455d-0x8a8c9345dca77c01' is supported
+d3d11va debug: - 'Unknown decoder 0xafe4285c-0xab63-0x4b2d-0x8278e6baacea2ce9' is supported
+d3d11va debug: - 'Unknown decoder 0x277de9c5-0xed83-0x48dd-0xab8fac2d24b22943' is supported
+d3d11va debug: - 'Unknown decoder 0x04c5ba10-0x4e9a-0x4b8e-0x8dbf4f4b48afa27c' is supported
+d3d11va debug: - 'Unknown decoder 0x0acef8bc-0x285f-0x415d-0xab227bf2527a3d2e' is supported
+d3d11va debug: - 'Unknown decoder 0x24d19fca-0xc5a2-0x4b8e-0x9f93f8f6ef15c890' is supported
+d3d11va debug: - 'Unknown decoder 0x353aca91-0xd945-0x4c13-0xae7e469060fac8d8' is supported
+d3d11va debug: - 'Unknown decoder 0x28566328-0xf041-0x4466-0x8b148f5831e78f8b' is supported
+d3d11va debug: - 'Unknown decoder 0x6b4a94db-0x54fe-0x4ae1-0x9be47a7dad004600' is supported
+d3d11va debug: - 'Unknown decoder 0xb8b28e0c-0xecab-0x4217-0x8c82eaaa9755aaf0' is supported
+d3d11va debug: - 'Unknown decoder 0x8732ecfd-0x9747-0x4897-0xb42ae534f9ff2b7a' is supported
+d3d11va debug: - 'Unknown decoder 0xe139b5ca-0x47b2-0x40e1-0xaf1cad71a67a1836' is supported
+d3d11va debug: - 'Unknown decoder 0x056a6e36-0xf3a8-0x4d00-0x96637e9430358bf9' is supported
+d3d11va debug: - 'Unknown decoder 0x5415a68c-0x231e-0x46f4-0x878b5e9a22e967e9' is supported
+d3d11va debug: - 'Unknown decoder 0x161be912-0x44c2-0x49c0-0xb61ed946852b32a1' is supported
+d3d11va debug: - 'Unknown decoder 0xd6d6bc4f-0xd51a-0x4712-0x97e8750917c860fd' is supported
+d3d11va debug: - 'Unknown decoder 0x7fef652d-0x3233-0x44df-0xacf7ecfb584dab35' is supported
+d3d11va debug: - 'Unknown decoder 0x87b2ae39-0xc9a5-0x4c53-0x86b8a52d7edba488' is supported
+d3d11va debug: - 'Unknown decoder 0x10e19ac8-0xbf39-0x4443-0xbec31b0cbfe4c7aa' is supported
+d3d11va debug: - 'Unknown decoder 0x2dec00c7-0x21ee-0x4bf8-0x8f0e773f11f126a2' is supported
+d3d11va debug: - 'Unknown decoder 0xc35153a0-0x23c0-0x4a81-0xb3bb6a1326f2b76b' is supported
+d3d11va debug: - 'Unknown decoder 0xa33fd0ec-0xa9d3-0x4c21-0x9276c241cc90f6c7' is supported
+d3d11va debug: - 'Unknown decoder 0x310e59d2-0x7ea4-0x47bb-0xb319500e78855336' is supported
+d3d11va debug: - 'Unknown decoder 0x036dff40-0x94a6-0x45b3-0xa0b371f0cdf35129' is supported
+d3d11va debug: - 'Unknown decoder 0x8c56eb1e-0x2b47-0x466f-0x8d337dbcd63f3df2' is supported
+d3d11va debug: - 'HEVC Main profile' is supported
+d3d11va debug: - 'Unknown decoder 0x75fc75f7-0xc589-0x4a07-0xa25b72e03b0383b3' is supported
+d3d11va debug: - 'HEVC Main 10 profile' is supported
+d3d11va debug: - 'Unknown decoder 0x9cc55490-0xe37c-0x4932-0x86844920f9f6409c' is supported
+d3d11va debug: - 'Unknown decoder 0x0bac4fe5-0x1532-0x4429-0xa854f84de04953db' is supported
+d3d11va debug: - 'Unknown decoder 0x4008018f-0xf537-0x4b36-0x98cf61af8a2c1a33' is supported
+d3d11va debug: - 'Unknown decoder 0x0dabeffa-0x4458-0x4602-0xbc030795659d617c' is supported
+d3d11va debug: - 'Unknown decoder 0x1a72925f-0x0c2c-0x4f15-0x96fbb17d1473603f' is supported
+d3d11va debug: - 'Unknown decoder 0x55bcac81-0xf311-0x4093-0xa7d01cbc0b849bee' is supported
+d3d11va debug: - 'Unknown decoder 0x9798634d-0xfe9d-0x48e5-0xb4dadbec45b3df01' is supported
+d3d11va debug: - 'Unknown decoder 0xe484dcb8-0xcac9-0x4859-0x99f55c0d45069089' is supported
+d3d11va debug: - 'Unknown decoder 0x41a5af96-0xe415-0x4b0c-0x9d03907858e23e78' is supported
+d3d11va debug: - 'Unknown decoder 0x6a6a81ba-0x912a-0x485d-0xb57fccd2d37b8d94' is supported
+d3d11va debug: - 'Unknown decoder 0xe4e3cf5b-0x97d2-0x4658-0xaacb366e3ee2ceee' is supported
+d3d11va debug: - 'Unknown decoder 0xfd9d9559-0x0fd3-0x4917-0xa9a707e714ee9ef9' is supported
+d3d11va debug: - 'Unknown decoder 0x0e4bc693-0x5d2c-0x4936-0xb125aefe32b16d8a' is supported
+d3d11va debug: - 'Unknown decoder 0x2f08b5b1-0xdbc2-0x4d48-0x883a4e7b8174cff6' is supported
+d3d11va debug: - 'Unknown decoder 0x5467807a-0x295d-0x445d-0xbd2ecba8c2457c3d' is supported
+d3d11va debug: - 'Unknown decoder 0xae0d4e15-0x2360-0x40a8-0xbf82028e6a0dd827' is supported
+d3d11va debug: - 'Unknown decoder 0x8ff8a3aa-0xc456-0x4132-0xb6ef69d9dd72571d' is supported
+d3d11va debug: - 'Unknown decoder 0xc23dd857-0x874b-0x423c-0xb6e082ceaa9b118a' is supported
+d3d11va debug: - 'Unknown decoder 0x5b08e35d-0x0c66-0x4c51-0xa6f189d00cb2c197' is supported
+d3d11va debug: - 'Unknown decoder 0x07cfaffb-0x5a2e-0x4b99-0xb62ae4ca53b6d5aa' is supported
+d3d11va debug: - 'VP9 profile 0' is supported
+d3d11va debug: - 'VP9 profile 2' is supported
+d3d11va debug: - 'VP9 profile Intel' is supported
+d3d11va debug: - 'Unknown decoder 0x68a21c7b-0xd58f-0x4e74-0x9993e4b8172b19a0' is supported
+d3d11va debug: - 'Unknown decoder 0x80a3a7bd-0x89d8-0x4497-0xa2b82126af7e6eb8' is supported
+d3d11va debug: - 'Unknown decoder 0x1d5c4d76-0xb55a-0x4430-0x904c3383a7ae3b16' is supported
+d3d11va debug: - 'Unknown decoder 0xa7f759dd-0x5f54-0x4d7f-0x829142e883c546fe' is supported
+d3d11va debug: - 'Unknown decoder 0xf34fa92f-0xdc79-0x474c-0xb0dbb7bd4522df77' is supported
+d3d11va debug: - 'AV1 Main profile 8' is supported
+d3d11va debug: - 'Unknown decoder 0xca44afc5-0xe1d0-0x42e6-0x9154b127186d4d40' is supported
+d3d11va debug: - 'Unknown decoder 0xf9a16190-0x3fb4-0x4dc5-0x9846c8751f83d6d7' is supported
+d3d11va debug: - 'Unknown decoder 0x50925b7b-0xe931-0x4978-0xa12a586630f095f9' is supported
+d3d11va debug: - 'Unknown decoder 0xb69c20e0-0x2508-0x8790-0x0305875499e0a2d0' is supported
+d3d11va debug: - 'Unknown decoder 0x49761bec-0x4b63-0x4349-0xa5ff87ffdf088466' is supported
+d3d11va debug: Trying to use 'H.264 variable-length decoder, no film grain technology' as input
+d3d11va debug: NV12 output is supported for decoder H.264 variable-length decoder, no film grain technology.
+d3d11va debug: Using output format NV12 for decoder H.264 variable-length decoder, no film grain technology
+d3d11va debug: va_pool_SetupDecoder id 27 1280x720 count: 24
+d3d11va debug: using external surface pool
+d3d11va debug: ID3D11VideoDecoderOutputView succeed with 24 surfaces (1280x720)
+d3d11va debug: we got 9 decoder configurations
+d3d11va debug: configuration[0] ConfigBitstreamRaw 2
+d3d11va debug: configuration[1] ConfigBitstreamRaw 1
+d3d11va debug: configuration[2] ConfigBitstreamRaw 2
+d3d11va debug: configuration[3] ConfigBitstreamRaw 2
+d3d11va debug: configuration[4] ConfigBitstreamRaw 2
+d3d11va debug: configuration[5] ConfigBitstreamRaw 2
+d3d11va debug: configuration[6] ConfigBitstreamRaw 2
+d3d11va debug: configuration[7] ConfigBitstreamRaw 1
+d3d11va debug: configuration[8] ConfigBitstreamRaw 1
+d3d11va debug: DxCreateDecoderSurfaces succeed
+main debug: using hw decoder module "d3d11va"
+avcodec: Using D3D11VA (Intel(R) UHD Graphics, vendor 8086(Intel), device a7a8, revision 4) for hardware decoding
+main error: buffer deadlock prevented
+main debug: Decoder wait done in 5051 ms
+main debug: killing decoder fourcc `h264'
+main debug: removing module "avcodec"
+main debug: saving a free vout
+main debug: reusing provided vout
+main debug: removing module "h264"
+main debug: removing module "live555"
+main debug: Program doesn't contain anymore ES
+main debug: removing module "mmdevice"
+main debug: destroying useless vout
+main debug: removing module "direct3d11"
+direct3d11 debug: Direct3D11 resources destroyed
+direct3d11 debug: Direct3D11 device adapter closed
+direct3d11 error: SetThumbNailClip failed: 0x800706F4
+direct3d11 debug: Win32 Vout EventThread terminating
+direct3d11 debug: Win32VoutCloseWindow
+direct3d11 debug: WinProc WM_DESTROY
+main debug: removing module "freetype"
+main debug: removing module "yuvp"
+main debug: removing module "swscale"
