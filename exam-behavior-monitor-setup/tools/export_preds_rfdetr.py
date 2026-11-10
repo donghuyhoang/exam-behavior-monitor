@@ -12,8 +12,12 @@ import argparse
 import glob
 import json
 import os
+import sys
 
 from PIL import Image
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from ai_service.detector import class_labels  # noqa: E402
 
 
 def main():
@@ -32,12 +36,16 @@ def main():
         kwargs["resolution"] = args.resolution
     model = {"nano": rfdetr.RFDETRNano, "small": rfdetr.RFDETRSmall, "medium": rfdetr.RFDETRMedium}[args.size](**kwargs)
     names = model.class_names
+    real = set(names.values() if isinstance(names, dict) else names)          # bỏ khung của lớp cha Roboflow
     paths = sorted(p for p in glob.glob(os.path.join(args.images, "*")) if p.lower().endswith((".jpg", ".jpeg", ".png")))
+    if not paths:
+        sys.exit(f"[LỖI] Không thấy ảnh .jpg/.png nào trong {args.images}")
+    print(f"{len(paths)} ảnh; lớp của mô hình: {names}")
     preds = []
     for i, p in enumerate(paths, 1):
         det = model.predict(Image.open(p).convert("RGB"), threshold=0.001)   # ngưỡng thấp để tính mAP
-        labels = det.data.get("class_name", [names[c] for c in det.class_id])
-        order = det.confidence.argsort()[::-1][:100]                           # tối đa 100 khung mỗi ảnh
+        labels = class_labels(det, names)
+        order = [k for k in det.confidence.argsort()[::-1] if labels[k] in real][:100]   # tối đa 100 khung mỗi ảnh
         for k in order:
             x1, y1, x2, y2 = det.xyxy[k].tolist()
             preds.append({"file_name": os.path.basename(p), "class_name": str(labels[k]),
@@ -48,6 +56,8 @@ def main():
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(preds, f)
     print(f"Đã ghi {len(preds)} khung của {len(paths)} ảnh vào {args.out}")
+    if not preds:
+        sys.exit("[LỖI] Không có khung nào: xem lại --weights, --resolution và bản rfdetr")
 
 
 if __name__ == "__main__":
