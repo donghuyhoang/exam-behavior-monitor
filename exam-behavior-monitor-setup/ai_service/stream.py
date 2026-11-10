@@ -77,6 +77,13 @@ class _VLCCap:
         with self._lock:
             return True, self._frame
 
+    def native_size(self):
+        """Kích thước gốc của luồng (VLC luôn trả khung đã đổi về width×height). (0, 0) nếu chưa biết."""
+        try:
+            return tuple(self._player.video_get_size(0))
+        except Exception:
+            return 0, 0
+
     def get(self, prop_id):
         if prop_id == cv2.CAP_PROP_FPS:
             return self._fps
@@ -98,9 +105,8 @@ class _VLCCap:
 
 def _open(source):
     if isinstance(source, str) and source.startswith("rtsp://"):
-        # 1. LibVLC trước (camera Yoosee/ONVIF trả header transport mà OpenCV không chịu)
         try:
-            cap = _VLCCap(source)
+            cap = _VLCCap(source, first_frame_s=VLC_FIRST_FRAME_S, stall_s=VLC_STALL_S)
         except Exception as e:  # chưa cài VLC 64-bit hoặc chưa pip install python-vlc
             print(f"[stream] LibVLC không khả dụng ({e}), chuyển sang OpenCV")
         else:

@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parent
 def load_env(path=ROOT / ".env"):
     if not path.exists():
         return
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in path.read_text(encoding="utf-8-sig").splitlines():   # utf-8-sig: .env lưu bằng Notepad có BOM vẫn đọc được
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue

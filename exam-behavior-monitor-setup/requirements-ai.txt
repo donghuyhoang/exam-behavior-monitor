@@ -5,4 +5,5 @@ paho-mqtt
 pyyaml
 numpy
 pillow
-python-vlc
+python-vlc     # đọc camera Yoosee (cần cài thêm VLC bản 64-bit)
+psutil         # tools/monitor_ram.py cho bài nghiệm thu chạy dài
