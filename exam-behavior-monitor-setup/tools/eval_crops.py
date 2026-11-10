@@ -21,6 +21,9 @@ import json
 import os
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from ai_service.detector import class_labels  # noqa: E402
+
 TARGETS = ("phone", "calculator")
 PERSON = "student"
 
@@ -84,7 +87,7 @@ def rfdetr_predict_fn(model, threshold=0.001):
 
     def predict(img):
         det = model.predict(img, threshold=threshold)
-        labels = det.data.get("class_name", [names[c] for c in det.class_id])
+        labels = class_labels(det, names)
         return [(str(labels[k]), float(det.confidence[k]), det.xyxy[k].tolist()) for k in range(len(det))]
 
     return predict
