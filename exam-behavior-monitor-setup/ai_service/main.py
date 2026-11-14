@@ -147,8 +147,8 @@ def main():
     tracker = IouTracker(max_lost=int(2 * fps_guess))   # mất dấu quá khoảng 2 giây thì coi là đối tượng mới
     r = cfg["rules"]
     rules = ViolationRules(r["alert_classes"], r["min_confidence"], r["window_s"], r["min_ratio"], r["cooldown_s"])
-    publisher = EventPublisher(cfg, dry_run=args.dry_run, out_dir=args.out)
     snapshot_root = Path(args.out) / "snapshots" if args.dry_run else ROOT / cfg["output"]["snapshot_dir"]
+    publisher = EventPublisher(cfg, dry_run=args.dry_run, out_dir=args.out, snapshot_root=snapshot_root)
     events = EventMaker(cfg, snapshot_root)
 
     mjpeg = None

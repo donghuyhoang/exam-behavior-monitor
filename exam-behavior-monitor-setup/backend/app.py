@@ -1,9 +1,13 @@
 """Backend: nhận sự kiện qua MQTT, lưu SQLite, đẩy cảnh báo mới qua WebSocket, phục vụ API và ảnh bằng chứng."""
 import asyncio
+import base64
+import binascii
 import json
+import re
 import sqlite3
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Literal, Optional
 
 import paho.mqtt.client as mqtt
@@ -46,6 +50,33 @@ def save_event(e):
              e.get("student_track_id"), json.dumps(e.get("bbox")), e.get("duration_s"), e.get("snapshot")))
 
 
+SNAPSHOT_RE = re.compile(r"snapshots/\d{4}-\d{2}-\d{2}/[\w.-]+\.jpg")
+MAX_SNAPSHOT_BYTES = 5 * 1024 * 1024
+
+
+def save_snapshot(e, snap_dir=None):
+    """Dịch vụ AI ở máy khác gửi kèm ảnh (snapshot_b64): ghi vào thư mục ảnh của backend. Trả về True nếu đã lưu."""
+    b64 = e.pop("snapshot_b64", None)
+    if not b64:
+        return False
+    rel = str(e.get("snapshot") or "")
+    if not SNAPSHOT_RE.fullmatch(rel) or ".." in rel:   # chỉ nhận đúng dạng snapshots/<ngày>/<id>.jpg
+        print("[mqtt] bỏ ảnh có đường dẫn lạ:", rel)
+        return False
+    try:
+        data = base64.b64decode(b64, validate=True)
+    except (binascii.Error, ValueError):
+        print("[mqtt] ảnh bằng chứng hỏng:", rel)
+        return False
+    if len(data) > MAX_SNAPSHOT_BYTES or not data.startswith(b"\xff\xd8"):   # JPEG bắt đầu bằng FF D8
+        print("[mqtt] bỏ ảnh quá lớn hoặc không phải JPEG:", rel)
+        return False
+    path = Path(snap_dir or SNAP_DIR).joinpath(*rel.split("/")[1:])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return True
+
+
 def row_out(r):
     d = dict(r)
     d["event_id"] = d.pop("id")
@@ -84,8 +115,10 @@ def handle_message(topic, payload, loop):
         return
     if topic == TOPIC_EVENTS:
         if "event_id" not in data or "ts" not in data:
+            data.pop("snapshot_b64", None)
             print("[mqtt] sự kiện thiếu event_id/ts:", data)
             return
+        save_snapshot(data)   # ghi ảnh trước để giao diện nhận sự kiện là mở được ảnh ngay
         save_event(data)
         message = {"kind": "event", "data": get_event(data["event_id"])}
     else:

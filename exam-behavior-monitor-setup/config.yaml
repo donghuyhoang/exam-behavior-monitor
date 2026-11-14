@@ -27,10 +27,17 @@ behavior:
   cooldown_s: 30
 
 mqtt:
-  host: 127.0.0.1              # máy chạy Mosquitto (laptop nhóm trưởng)
+  host: 127.0.0.1              # máy chạy Mosquitto. Laptop dùng Raspberry Pi thì ghi MQTT_HOST=<ip-pi> trong .env
   port: 1883
   topic_events: pbl4/room1/events
   topic_status: pbl4/room1/status
+  send_snapshot: auto          # gửi kèm ảnh bằng chứng qua MQTT. auto: chỉ gửi khi Mosquitto ở máy khác (Pi)
+
+pi_station:                    # trạm báo trên Raspberry Pi (pi/station.py), số chân theo GPIO (BCM)
+  api: http://127.0.0.1:8000
+  status_timeout_s: 15         # quá 15 giây không nhận trạng thái từ dịch vụ AI thì báo mất AI
+  pins: {red: 17, yellow: 27, green: 22, confirm: 5, dismiss: 6}
+  buzzer: null                 # không dùng còi. Muốn thêm còi 3 chân (S8550) thì ghi 4 (GPIO4) và nối VCC vào 3.3V
 
 output:
   snapshot_dir: data/snapshots

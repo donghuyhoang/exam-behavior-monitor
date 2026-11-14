@@ -3,8 +3,10 @@
     python -m backend.fake_events --every 3                    # điện thoại
     python -m backend.fake_events --every 3 --type head_turn   # quay đầu (nhìn bài)
     python -m backend.fake_events --every 3 --type mix         # trộn ngẫu nhiên ba loại
+Ghi MQTT_HOST=<ip-pi> trong .env thì sự kiện và ảnh được gửi sang backend trên Raspberry Pi.
 """
 import argparse
+import base64
 import json
 import random
 import time
@@ -13,6 +15,7 @@ from datetime import datetime
 import paho.mqtt.client as mqtt
 from PIL import Image, ImageDraw
 
+from ai_service.publisher import should_send_snapshot
 from settings import ROOT, load_config
 
 
@@ -42,6 +45,8 @@ def main():
     client.connect(cfg["mqtt"]["host"], int(cfg["mqtt"]["port"]), keepalive=30)
     client.loop_start()
     snap_root = ROOT / cfg["output"]["snapshot_dir"]
+    send_snapshot = should_send_snapshot(cfg["mqtt"])
+    print(f"[fake] gửi tới Mosquitto {cfg['mqtt']['host']}:{cfg['mqtt']['port']}")
     n, next_event = 0, time.time()
     try:
         while args.count == 0 or n < args.count:
@@ -58,13 +63,16 @@ def main():
                 else:
                     box = [random.randint(100, 1000), random.randint(100, 500), random.randint(30, 70), random.randint(40, 90)]
                 rel = f"snapshots/{now:%Y-%m-%d}/{event_id}.jpg"
-                make_snapshot(snap_root / f"{now:%Y-%m-%d}" / f"{event_id}.jpg", box, args.image, kind)
+                snap_path = snap_root / f"{now:%Y-%m-%d}" / f"{event_id}.jpg"
+                make_snapshot(snap_path, box, args.image, kind)
                 event = {"event_id": event_id, "camera_id": cfg["camera"]["id"], "ts": now.isoformat(timespec="seconds"),
                          "type": kind, "confidence": round(random.uniform(0.5, 0.97), 2),
                          "track_id": random.randint(1, 40), "student_track_id": random.randint(1, 20),
                          "bbox": box, "duration_s": round(random.uniform(2.0, 4.0), 1), "snapshot": rel}
+                if send_snapshot:   # backend ở máy khác (Pi): gửi kèm ảnh như dịch vụ AI
+                    event["snapshot_b64"] = base64.b64encode(snap_path.read_bytes()).decode("ascii")
                 client.publish(cfg["mqtt"]["topic_events"], json.dumps(event, ensure_ascii=False), qos=1)
-                print("[fake] đã gửi", event_id, kind)
+                print("[fake] đã gửi", event_id, kind, "(kèm ảnh)" if send_snapshot else "")
                 next_event = time.time() + args.every
             time.sleep(1.0)
     except KeyboardInterrupt:

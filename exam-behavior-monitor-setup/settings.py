@@ -21,4 +21,7 @@ def load_env(path=ROOT / ".env"):
 def load_config(path=ROOT / "config.yaml"):
     load_env()
     text = os.path.expandvars(Path(path).read_text(encoding="utf-8"))
-    return yaml.safe_load(text)
+    cfg = yaml.safe_load(text)
+    if os.environ.get("MQTT_HOST"):   # mỗi máy ghi địa chỉ Mosquitto trong .env, không phải sửa config.yaml chung
+        cfg["mqtt"]["host"] = os.environ["MQTT_HOST"]
+    return cfg

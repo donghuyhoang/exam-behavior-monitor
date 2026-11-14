@@ -11,6 +11,7 @@ Camera (RTSP) → `ai_service` (RF-DETR + theo dõi + luật vi phạm) → MQTT
 | `ui/` | C | `index.html` giao diện tham khảo, backend phục vụ ở `/ui/` |
 | `behavior/` | NT (P1) | `head_pose.py` MediaPipe phát hiện quay đầu |
 | `tools/` | NT, A | `probe_camera.py` dò camera, `export_preds_rfdetr.py` xuất dự đoán để chấm điểm, `mosquitto.conf` |
+| `pi/` | A | Raspberry Pi: `station.py` trạm báo 3 đèn, 2 nút; `setup.sh` cài một lần; `README.md` hướng dẫn |
 | `tests/` | mọi người | kiểm thử luật và bộ theo dõi, không cần GPU |
 
 `weights/` (checkpoint), `data/` (cơ sở dữ liệu, ảnh bằng chứng), `.env` (mật khẩu camera) không commit.
@@ -40,6 +41,11 @@ Hoặc bật cả ba bằng một lệnh: `powershell -ExecutionPolicy Bypass -F
 Dịch vụ AI mất khoảng 30–50 giây để nạp và biên dịch mô hình trước khi có hình. Đo trên laptop RTX 5050: mô hình 27 FPS, cả vòng xử lý khoảng 24 FPS.
 
 Mở http://localhost:8000/ui/. Máy khác trong cùng mạng mở `http://<ip-laptop>:8000/ui/` (cho phép cổng 1883, 8000, 8001 trong Windows Firewall, mạng Private).
+
+## Chạy với Raspberry Pi (máy chủ phòng thi)
+
+Pi giữ Mosquitto, backend và trạm báo có 3 đèn, 2 nút cho giám thị; laptop chỉ chạy AI. Hướng dẫn cài và đấu dây: [`pi/README.md`](pi/README.md).
+Trên laptop chỉ cần thêm `MQTT_HOST=<ip-pi>` vào `.env` rồi chạy `python -m ai_service.main --show`.
 
 ## Không có camera hoặc GPU
 
