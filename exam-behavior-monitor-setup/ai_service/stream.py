@@ -5,7 +5,8 @@ import time
 
 import cv2
 import numpy as np
-
+VLC_FIRST_FRAME_S = 8.0   # chờ khung hình đầu tiên từ camera tối đa 8 giây
+VLC_STALL_S = 5.0         # quá 5 giây không có khung mới thì coi là mất camera
 
 def _is_live(source):
     return isinstance(source, int) or str(source).startswith(("rtsp://", "http://", "https://"))
